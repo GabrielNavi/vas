@@ -1,0 +1,15 @@
+Source: vx-dga-l-vas
+Priority: optional
+Maintainer: Gabriel Navia <correos@gabrielnav.es>
+Standards-Version: 4.6.0
+Build-Depends: debhelper-compat (= 13), python3-venv
+Section: admin
+
+Package: vx-dga-l-vas
+Architecture: all
+Depends: python3
+Description: Servidor de Autorregistro de Vitalinux (VAS)
+ Un servicio ligero HTTP+SQLite que autorregistra clientes Veyon
+ y genera automáticamente la configuración computers.json de Veyon.
+ Este paquete instala un servidor basado en FastAPI, un servicio systemd,
+ y la estructura de directorios necesaria bajo /usr, /etc y /var.
