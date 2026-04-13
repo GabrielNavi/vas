@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+
+echo "[VAS] Deteniendo servicio antes de eliminar..."
+systemctl stop vas.service || true
+systemctl disable vas.service || true

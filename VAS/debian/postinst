@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+echo "[VAS] Ejecutando postinst..."
+
+# Crear directorios persistentes
+mkdir -p /var/lib/vas
+mkdir -p /var/log/vas
+
+# Crear DB si no existe
+if [ ! -f /var/lib/vas/vas.db ]; then
+    echo "[VAS] Creando base de datos inicial..."
+    python3 /usr/lib/vas/database.py --init
+fi
+
+# Crear JSON inicial si no existe
+if [ ! -f /var/lib/vas/computers.json ]; then
+    echo '{"computers": []}' > /var/lib/vas/computers.json
+fi
+
+# Instalar dependencias Python si faltan
+echo "[VAS] Comprobando dependencias Python..."
+for pkg in fastapi uvicorn pydantic; do
+    python3 -c "import ${pkg%%=*}" 2>/dev/null || pip3 install "$pkg"
+done
+
+# Recargar systemd
+systemctl daemon-reload
+
+# Habilitar servicio
+systemctl enable vas.service
+
+echo "[VAS] Instalación completada. Puedes iniciar el servicio con:"
+echo "  systemctl start vas"

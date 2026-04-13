@@ -1,0 +1,12 @@
+[Unit]
+Description=Vitalinux Autoregistration Server (VAS)
+After=network.target
+
+[Service]
+WorkingDirectory=/usr/lib/vas
+ExecStart=/usr/bin/vas
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
