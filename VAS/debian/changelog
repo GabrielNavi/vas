@@ -1,0 +1,18 @@
+vx-dga-l-vas (0.2-0) unstable; urgency=medium
+
+  * packaging: remove pip from runtime dependencies.
+  * packaging: add python3-venv to Build-Depends for builder venv setup.
+  * postinst: make systemd calls resilient (daemon-reload/enable with fallback).
+  * postinst: auto-start service on fresh install.
+  * postinst: restart service on upgrade.
+  * config policy: keep Veyon output focused on computers.json.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +02:00
+
+vx-dga-l-vas (0.1-0) unstable; urgency=medium
+
+  * Initial commit.
+  * Debian package skeleton for VAS.
+  * Added systemd service, launcher, default config and maintainer scripts.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +02:00
