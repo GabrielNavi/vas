@@ -1,8 +1,13 @@
 #!/bin/bash
 set -e
 
+echo "[VAS] Ejecutando postrm..."
+
+# Si se ejecuta con "purge", eliminar datos persistentes
 if [ "$1" = "purge" ]; then
     echo "[VAS] Eliminando datos persistentes..."
     rm -rf /var/lib/vas
     rm -f /var/log/vas.log
 fi
+
+exit 0
