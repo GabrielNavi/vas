@@ -14,21 +14,35 @@ build-vitalinux3x:
   stage: build
 
   script:
-    # Dependencias necesarias para construir paquetes Debian
     - apt-get update
-    - apt-get install -y python3 python3-venv python3-dev build-essential devscripts debhelper
+    - apt-get install -y python3-venv python3-dev build-essential devscripts debhelper
 
-    # Crear usuario de build
+    # Crear usuario
     - useradd -m $_USER
 
-    # Dar permisos del workspace al usuario
+    # Dar permisos al workspace y al directorio padre
     - chown -R $_USER:$_USER .
+    - chown -R $_USER:$_USER ..
 
-    # Ejecutar la build como usuario normal SIN cambiar de directorio
-    - su -s /bin/bash $_USER -c "dpkg-buildpackage -us -uc"
+    # Crear directorio destino
+    - mkdir -p $_PATH
+    - chown -R $_USER:$_USER /home/$_USER
 
-    # Recuperar los .deb generados (dpkg-buildpackage los deja en ..)
-    - mv ../*.deb .
+    # Copiar proyecto y tarball upstream
+    - cp -a * $_PATH
+    - cp ../*.orig.tar.* $_PATH || true
+
+    # Asegurar permisos
+    - chown -R $_USER:$_USER $_PATH
+    - chmod +x $_PATH/debian/rules
+
+    # Build dentro del directorio copiado
+    - pushd $_PATH
+    - su -s /bin/bash $_USER -c "debuild --no-tgz-check -us -uc"
+    - popd
+
+    # Recuperar .deb
+    - mv /home/$_USER/*.deb .
 
   artifacts:
     expire_in: 1 day
