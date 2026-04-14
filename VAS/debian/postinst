@@ -7,15 +7,14 @@ echo "[VAS] Ejecutando postinst..."
 mkdir -p /var/lib/vas
 mkdir -p /var/log/vas
 
-# Crear DB si no existe
-if [ ! -f /var/lib/vas/vas.db ]; then
-    echo "[VAS] Creando base de datos inicial..."
-    python3 /usr/lib/vas/database.py --init || true
-fi
-
 # Crear JSON inicial si no existe
 if [ ! -f /var/lib/vas/computers.json ]; then
     echo '{"computers": []}' > /var/lib/vas/computers.json
+fi
+
+# Crear archivo de versión si no existe
+if [ ! -f /var/lib/vas/version ]; then
+    echo "0" > /var/lib/vas/version
 fi
 
 # Recargar systemd
@@ -34,3 +33,4 @@ if [ "$1" = "configure" ]; then
 fi
 
 echo "[VAS] Instalación completada."
+
