@@ -1,3 +1,39 @@
+vx-dga-l-vas (0.2-6) unstable; urgency=medium
+
+  * Movimiento de raiz del arbol del paquete.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:30:00 +0200
+
+vx-dga-l-vas (0.2-5) unstable; urgency=medium
+
+  * Modificacion de base de datos.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:20:00 +0200
+
+vx-dga-l-vas (0.2-4) unstable; urgency=medium
+
+  * Cambio en postinst para no llamar a database.py.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:10:00 +0200
+
+vx-dga-l-vas (0.2-3) unstable; urgency=medium
+
+  * Diseno inicial de vas.py.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:00:00 +0200
+
+vx-dga-l-vas (0.2-2) unstable; urgency=medium
+
+  * Cambios en scripts de instalacion Debian.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:50:00 +0200
+
+vx-dga-l-vas (0.2-1) unstable; urgency=medium
+
+  * Creado control y normalizacion de configuracion y wrapper de VAS.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:40:00 +0200
+
 vx-dga-l-vas (0.2-0) unstable; urgency=medium
 
   * packaging: remove pip from runtime dependencies.

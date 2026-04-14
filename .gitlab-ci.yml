@@ -1,0 +1,44 @@
+variables:
+  _USER: "builduser"
+  _PATH: /home/$_USER/$CI_PROJECT_NAME
+  _DEPLOY: "test-gabriel"
+stages:
+  - build
+  - upload
+  - deployment
+build-vitalinux3x:
+  image: vitalinux3x:dev
+  stage: build
+  script:
+    - useradd -m $_USER
+    - mkdir -p $_PATH
+    - cp -a * $_PATH
+    - chmod +x $_PATH/debian/rules
+    - pushd $_PATH
+    - su -c "/usr/bin/debuild --no-tgz-check -us -uc" $_USER
+    - popd
+    - mv /home/$_USER/*.deb .
+  artifacts:
+    expire_in: 1 days
+    paths:
+    - ./*.deb
+  only:
+    - tags
+upload-vitalinux3x:
+  image: vitalinux3x:dev
+  stage: upload
+  script:
+    - MIGASFREE_PACKAGER_PROJECT=VX-3.x migasfree-upload -f *.deb
+  dependencies:
+    - build-vitalinux3x
+  only:
+    - tags
+continous-deploy3x:
+ image: vitalinux3x:dev
+ stage: deployment
+ script:
+   - /usr/bin/migasfree-cd -s "$MIGASFREE_CLIENT_SERVER" -p "VX-3.x" -d "$_DEPLOY" *.deb
+ dependencies:
+   - build-vitalinux3x
+ only:
+   - tags
