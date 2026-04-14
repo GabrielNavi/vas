@@ -10,8 +10,10 @@ build-vitalinux3x:
   image: vitalinux3x:dev
   stage: build
   script:
+    - export DEBIAN_FRONTEND=noninteractive
     - apt-get update
-    - apt-get install -y python3-full
+    - apt-get install -y python3-venv python3-dev
+    - dpkg-buildpackage -us -uc
     - useradd -m $_USER
     - mkdir -p $_PATH
     - cp -a * $_PATH
