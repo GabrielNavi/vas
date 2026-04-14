@@ -1,4 +1,15 @@
-#!/bin/bash
+#!/bin/sh
+set -e
 
-# Lanzador del servidor VAS usando el entorno virtual interno
-exec /usr/lib/vas/venv/bin/uvicorn vas:app --host 0.0.0.0 --port 8000
+# Lanzador del servidor VAS usando el entorno virtual interno.
+# Permite sobrescribir el puerto desde /etc/vas/vas.conf.
+PORT=8000
+CONF_FILE=/etc/vas/vas.conf
+
+if [ -f "$CONF_FILE" ]; then
+	# Carga variables como PORT=NNNN desde el archivo de configuracion.
+	# shellcheck disable=SC1090
+	. "$CONF_FILE"
+fi
+
+exec /usr/lib/vas/venv/bin/uvicorn vas:app --host 0.0.0.0 --port "${PORT:-8000}"
