@@ -2,32 +2,42 @@ variables:
   _USER: "builduser"
   _PATH: /home/$_USER/$CI_PROJECT_NAME
   _DEPLOY: "test-gabriel"
+  DEBIAN_FRONTEND: noninteractive
+
 stages:
   - build
   - upload
   - deployment
+
 build-vitalinux3x:
   image: vitalinux3x:dev
   stage: build
+
   script:
-    - export DEBIAN_FRONTEND=noninteractive
+    # Herramientas necesarias para construir paquetes Debian
     - apt-get update
-    - apt-get install -y python3-venv python3-dev
-    - dpkg-buildpackage -us -uc
+    - apt-get install -y python3 python3-venv python3-dev build-essential devscripts debhelper
+
+    # Crear usuario de build
     - useradd -m $_USER
-    - mkdir -p $_PATH
-    - cp -a * $_PATH
-    - chmod +x $_PATH/debian/rules
-    - pushd $_PATH
-    - su -c "/usr/bin/debuild --no-tgz-check -us -uc" $_USER
-    - popd
-    - mv /home/$_USER/*.deb .
+
+    # Dar permisos del workspace al usuario de build
+    - chown -R $_USER:$_USER .
+
+    # Ejecutar la build como usuario normal (correcto)
+    - su - $_USER -c "dpkg-buildpackage -us -uc"
+
+    # Recuperar los .deb generados (dpkg-buildpackage los deja en ..)
+    - mv ../*.deb .
+
   artifacts:
-    expire_in: 1 days
+    expire_in: 1 day
     paths:
-    - ./*.deb
+      - ./*.deb
+
   only:
     - tags
+
 # upload-vitalinux3x:
 #   image: vitalinux3x:dev
 #   stage: upload
