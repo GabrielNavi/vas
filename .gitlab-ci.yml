@@ -10,6 +10,7 @@ build-vitalinux3x:
   image: vitalinux3x:dev
   stage: build
   script:
+    - apt-get install python3-venv -y
     - useradd -m $_USER
     - mkdir -p $_PATH
     - cp -a * $_PATH
