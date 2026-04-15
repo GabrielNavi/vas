@@ -15,7 +15,7 @@ build-vitalinux3x:
 
   script:
     - apt-get update
-    - apt-get install -y python3-venv python3-dev build-essential devscripts debhelper
+    - apt-get install -y python3-dev build-essential devscripts debhelper
 
     # Crear usuario
     - useradd -m $_USER

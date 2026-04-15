@@ -1,3 +1,11 @@
+vx-dga-l-vas (0.2-7) unstable; urgency=medium
+
+  * packaging: switch VAS to system Python dependencies instead of bundled venv.
+  * build: remove python3-venv and pip-based virtualenv creation from rules.
+  * runtime: launch uvicorn from the system path.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 15 Apr 2026 10:00:00 +0200
+
 vx-dga-l-vas (0.2-6) unstable; urgency=medium
 
   * Movimiento de raiz del arbol del paquete.
@@ -41,7 +49,7 @@ vx-dga-l-vas (0.2-0) unstable; urgency=medium
   * postinst: make systemd calls resilient (daemon-reload/enable with fallback).
   * postinst: auto-start service on fresh install.
   * postinst: restart service on upgrade.
-  * config policy: keep Veyon output focused on computers.json.
+  * config policy: keep Veyon output focused on computers.json.gitl
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +02:00
 

@@ -1,15 +1,4 @@
 #!/usr/bin/make -f
 
-export DH_VERBOSE = 1
-
 %:
 	dh $@
-
-override_dh_auto_install:
-	dh_auto_install
-
-	# Crear entorno virtual dentro del paquete
-	python3 -m venv debian/vx-dga-l-vas/usr/lib/vas/venv
-
-	# Instalar dependencias Python dentro del venv
-	debian/vx-dga-l-vas/usr/lib/vas/venv/bin/pip install --no-cache-dir fastapi uvicorn pydantic
