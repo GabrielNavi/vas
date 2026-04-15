@@ -1,8 +1,10 @@
-vx-dga-l-vas (0.2-7) unstable; urgency=medium
+vx-dga-l-vas (0.3-1) unstable; urgency=medium
 
-  * packaging: switch VAS to system Python dependencies instead of bundled venv.
-  * build: remove python3-venv and pip-based virtualenv creation from rules.
-  * runtime: launch uvicorn from the system path.
+  * Revisión mayor del empaquetado de VAS.
+  * Eliminado el venv empaquetado y uso de pip en build.
+  * Dependencias Python resueltas desde el sistema.
+  * Wrapper de arranque ajustado para usar uvicorn del sistema.
+  * CI y build alineados con el nuevo modelo de instalación.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 15 Apr 2026 10:00:00 +0200
 
