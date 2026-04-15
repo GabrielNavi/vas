@@ -1,3 +1,13 @@
+vx-dga-l-vas (0.3-2) unstable; urgency=medium
+
+  * Corregido el wrapper de arranque para usar "/usr/bin/python3 -m uvicorn"
+    y evitar fallos por PATH en systemd (error 127).
+  * Ajustada la definición del modelo Client para compatibilidad con
+    pydantic 1.x (mac: Optional[str] en lugar de "str | None").
+  * Validado en VM: vas.service arranca correctamente en estado active.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 15 Apr 2026 11:10:00 +0200
+
 vx-dga-l-vas (0.3-1) unstable; urgency=medium
 
   * Revisión mayor del empaquetado de VAS.

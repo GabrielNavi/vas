@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import json
+from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -51,7 +52,7 @@ class Client(BaseModel):
     id: str
     hostname: str
     ip: str
-    mac: str | None = None
+    mac: Optional[str] = None
 
 
 @app.post("/register")
