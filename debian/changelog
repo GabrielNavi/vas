@@ -1,3 +1,23 @@
+vx-dga-l-vas (0.4-2) unstable; urgency=medium
+
+  * Corregida la ruta de registro para que fallos puntuales al sincronizar
+    networkobjects con Veyon Master no bloqueen POST /register.
+  * Endurecida la sanitizacion de VEYON_LOCATION al generar CSV de importacion.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 12:35:00 +0200
+
+vx-dga-l-vas (0.4-1) unstable; urgency=medium
+
+  * Añadida sincronizacion automatica de networkobjects en Veyon Master.
+  * VAS ahora genera CSV e importa objetos con formato
+    %type%;%name%;%host%;%mac%;%location% mediante veyon-cli.
+  * La sincronizacion se limita a una location configurable y no bloquea
+    el arranque del servicio si Veyon no esta disponible.
+  * Nuevas opciones de configuracion: VEYON_MASTER_SYNC, VEYON_LOCATION
+    y VEYON_CSV_PATH.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 11:15:00 +0200
+
 vx-dga-l-vas (0.3-2) unstable; urgency=medium
 
   * Corregido el wrapper de arranque para usar "/usr/bin/python3 -m uvicorn"

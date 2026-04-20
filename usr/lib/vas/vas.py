@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import json
+import shutil
+import subprocess
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -18,7 +20,10 @@ def load_config():
         "PORT": 8000,
         "DB_PATH": "/var/lib/vas/vas.db",
         "CONFIG_PATH": "/var/lib/vas/computers.json",
-        "VERSION_FILE": "/var/lib/vas/version"
+        "VERSION_FILE": "/var/lib/vas/version",
+        "VEYON_MASTER_SYNC": "1",
+        "VEYON_LOCATION": "Autoregistrados",
+        "VEYON_CSV_PATH": "/var/lib/vas/computers-master.csv"
     }
 
     if os.path.exists(CONFIG_FILE):
@@ -55,6 +60,50 @@ class Client(BaseModel):
     mac: Optional[str] = None
 
 
+def _is_enabled(value: str) -> bool:
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def sync_veyon_master() -> None:
+    if not _is_enabled(config.get("VEYON_MASTER_SYNC", "1")):
+        return
+
+    if shutil.which("veyon-cli") is None:
+        return
+
+    clients = database.get_all_clients()
+    csv_path = config["VEYON_CSV_PATH"]
+    location = (config["VEYON_LOCATION"] or "Autoregistrados").replace(";", "")
+
+    os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+    with open(csv_path, "w", encoding="utf-8") as f:
+        for c in clients:
+            hostname = (c.get("hostname") or "").replace(";", "")
+            ip = (c.get("ip") or "").replace(";", "")
+            mac = (c.get("mac") or "").replace(";", "")
+            f.write(f"computer;{hostname};{ip};{mac};{location}\n")
+
+    # Refrescamos solo la location administrada por VAS para no afectar otras.
+    subprocess.run(
+        ["veyon-cli", "networkobjects", "remove", location],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    subprocess.run(
+        [
+            "veyon-cli",
+            "networkobjects",
+            "import",
+            csv_path,
+            "format",
+            "%type%;%name%;%host%;%mac%;%location%",
+        ],
+        check=True,
+    )
+
+
 @app.post("/register")
 def register(client: Client):
     try:
@@ -68,6 +117,11 @@ def register(client: Client):
 
         if changed:
             database.regenerate_json()
+            try:
+                sync_veyon_master()
+            except Exception as e:
+                # El autoregistro no debe fallar por un problema puntual de Veyon.
+                print(f"[VAS] Aviso: fallo al sincronizar con Veyon Master: {e}")
             version = database.bump_version()
         else:
             version = database.get_version()
@@ -90,3 +144,14 @@ def config_file():
             return json.load(f)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Config not found")
+
+
+@app.on_event("startup")
+def startup_sync() -> None:
+    # En arranque sincronizamos para asegurar estado consistente en Veyon Master.
+    try:
+        database.regenerate_json()
+        sync_veyon_master()
+    except Exception:
+        # No bloqueamos el arranque del servicio por fallos de integración opcional.
+        pass

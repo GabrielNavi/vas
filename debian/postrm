@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 echo "[VAS] Ejecutando postrm..."
@@ -7,6 +7,7 @@ echo "[VAS] Ejecutando postrm..."
 if [ "$1" = "purge" ]; then
     echo "[VAS] Eliminando datos persistentes..."
     rm -rf /var/lib/vas
+    rm -rf /var/log/vas
     rm -f /var/log/vas.log
 fi
 
