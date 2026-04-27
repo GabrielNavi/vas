@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import database
 
 CONFIG_FILE = "/etc/vas/vas.conf"
+CONFIG_DIR = "/etc/vas/vas.conf.d"
 
 
 # -----------------------------
@@ -26,12 +27,27 @@ def load_config():
         "VEYON_CSV_PATH": "/var/lib/vas/computers-master.csv"
     }
 
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE) as f:
+    def _apply_file(path: str) -> None:
+        if not os.path.isfile(path):
+            return
+
+        with open(path, encoding="utf-8") as f:
             for line in f:
-                if "=" in line:
-                    k, v = line.strip().split("=", 1)
-                    cfg[k] = v
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                cfg[k] = v
+
+    _apply_file(CONFIG_FILE)
+
+    if os.path.isdir(CONFIG_DIR):
+        for name in sorted(os.listdir(CONFIG_DIR)):
+            if name.endswith(".conf"):
+                _apply_file(os.path.join(CONFIG_DIR, name))
 
     return cfg
 

@@ -5,11 +5,21 @@ set -e
 # Permite sobrescribir el puerto desde /etc/vas/vas.conf.
 PORT=8000
 CONF_FILE=/etc/vas/vas.conf
+CONF_DIR=/etc/vas/vas.conf.d
 
 if [ -f "$CONF_FILE" ]; then
 	# Carga variables como PORT=NNNN desde el archivo de configuracion.
 	# shellcheck disable=SC1090
 	. "$CONF_FILE"
+fi
+
+# Carga sobreescrituras desde /etc/vas/vas.conf.d/*.conf en orden lexical.
+if [ -d "$CONF_DIR" ]; then
+	for cfg in "$CONF_DIR"/*.conf; do
+		[ -f "$cfg" ] || continue
+		# shellcheck disable=SC1090
+		. "$cfg"
+	done
 fi
 
 cd /usr/lib/vas

@@ -6,6 +6,7 @@ echo "[VAS] Ejecutando postinst..."
 # Crear directorios persistentes
 mkdir -p /var/lib/vas
 mkdir -p /var/log/vas
+mkdir -p /etc/vas/vas.conf.d
 
 # Crear JSON inicial si no existe
 if [ ! -f /var/lib/vas/computers.json ]; then

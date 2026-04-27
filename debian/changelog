@@ -1,3 +1,12 @@
+vx-dga-l-vas (0.4-3) unstable; urgency=medium
+
+  * Añadido soporte de subconfiguracion en /etc/vas/vas.conf.d/*.conf
+    para permitir overlays sin modificar vas.conf base.
+  * El wrapper y la aplicacion Python cargan configuracion en cascada.
+  * postinst asegura la creacion de /etc/vas/vas.conf.d.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
+
 vx-dga-l-vas (0.4-2) unstable; urgency=medium
 
   * Corregida la ruta de registro para que fallos puntuales al sincronizar
