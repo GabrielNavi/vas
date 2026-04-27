@@ -18,6 +18,8 @@ Adicionalmente, VAS puede sincronizar automáticamente los networkobjects en un 
   - python3-pydantic
 - systemd para gestión del servicio.
 
+- Sincronización con VEYON depende de tener disponible veyon-cli instalado
+
 ## Informacion del Paquete
 
 - Nombre: vx-dga-l-vas
