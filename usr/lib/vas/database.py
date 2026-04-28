@@ -2,6 +2,7 @@
 import sqlite3
 import json
 import os
+import datetime
 
 # Estas variables serán inyectadas por vas.py
 DB_PATH = None
@@ -104,7 +105,7 @@ def get_version():
 
 
 def bump_version():
-    v = get_version() + 1
+    version = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
     with open(VERSION_FILE, "w") as f:
-        f.write(str(v))
-    return v
+        f.write(version)
+    return version

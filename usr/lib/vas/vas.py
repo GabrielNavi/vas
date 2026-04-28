@@ -24,7 +24,8 @@ def load_config():
         "VERSION_FILE": "/var/lib/vas/version",
         "VEYON_MASTER_SYNC": "1",
         "VEYON_LOCATION": "Autoregistrados",
-        "VEYON_CSV_PATH": "/var/lib/vas/computers-master.csv"
+        "VEYON_CSV_PATH": "/var/lib/vas/computers-master.csv",
+        "CLIENT_TTL_DAYS": "30",
     }
 
     def _apply_file(path: str) -> None:
@@ -42,14 +43,17 @@ def load_config():
                 v = v.strip().strip('"').strip("'")
                 cfg[k] = v
 
+    # Config principal
     _apply_file(CONFIG_FILE)
 
+    # Overlays en orden lexical
     if os.path.isdir(CONFIG_DIR):
         for name in sorted(os.listdir(CONFIG_DIR)):
             if name.endswith(".conf"):
                 _apply_file(os.path.join(CONFIG_DIR, name))
 
     return cfg
+
 
 
 config = load_config()
@@ -61,6 +65,23 @@ database.VERSION_FILE = config["VERSION_FILE"]
 
 # Inicializar DB y versión
 database.init_db()
+
+import datetime
+
+def cleanup_old_clients(days: int) -> int:
+    """Elimina clientes cuyo last_seen sea más antiguo que X días."""
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+
+    conn = database.get_connection()
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM clients WHERE last_seen < ?", (cutoff,))
+    deleted = cur.rowcount
+
+    conn.commit()
+    conn.close()
+
+    return deleted
 
 
 # -----------------------------
@@ -164,10 +185,18 @@ def config_file():
 
 @app.on_event("startup")
 def startup_sync() -> None:
-    # En arranque sincronizamos para asegurar estado consistente en Veyon Master.
     try:
+        # Limpieza automática de clientes antiguos
+        ttl_days = int(config.get("CLIENT_TTL_DAYS", 30))
+        deleted = cleanup_old_clients(ttl_days)
+        if deleted > 0:
+            print(f"[VAS] Limpieza automática: eliminados {deleted} clientes antiguos (> {ttl_days} días).")
+
+        # Regenerar JSON y sincronizar Veyon
         database.regenerate_json()
         sync_veyon_master()
-    except Exception:
+
+    except Exception as e:
+        print(f"[VAS] Aviso: fallo en startup_sync(): {e}")
         # No bloqueamos el arranque del servicio por fallos de integración opcional.
         pass

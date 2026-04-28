@@ -1,0 +1,146 @@
+#!/bin/bash
+set -euo pipefail
+
+CONFIG_FILE="/etc/vas/vas.conf"
+CONFIG_DIR="/etc/vas/vas.conf.d"
+
+TTL_DEFAULT=30
+
+# -----------------------------
+# Cargar configuración
+# -----------------------------
+TTL="$TTL_DEFAULT"
+DB_PATH="/var/lib/vas/vas.db"
+JSON_PATH="/var/lib/vas/computers.json"
+VERSION_FILE="/var/lib/vas/version"
+VEYON_CSV_PATH="/var/lib/vas/computers-master.csv"
+VEYON_LOCATION="Autoregistrados"
+
+load_conf() {
+    local file="$1"
+    [ -f "$file" ] || return
+
+    while IFS='=' read -r key val; do
+        key="$(echo "$key" | xargs)"
+        val="$(echo "$val" | xargs | sed 's/^"//; s/"$//')"
+
+        case "$key" in
+            CLIENT_TTL_DAYS) TTL="$val" ;;
+            DB_PATH) DB_PATH="$val" ;;
+            CONFIG_PATH) JSON_PATH="$val" ;;
+            VERSION_FILE) VERSION_FILE="$val" ;;
+            VEYON_CSV_PATH) VEYON_CSV_PATH="$val" ;;
+            VEYON_LOCATION) VEYON_LOCATION="$val" ;;
+        esac
+    done < <(grep -v '^#' "$file" || true)
+}
+
+# Config principal
+load_conf "$CONFIG_FILE"
+
+# Overlays
+if [ -d "$CONFIG_DIR" ]; then
+    for cfg in "$CONFIG_DIR"/*.conf; do
+        [ -f "$cfg" ] || continue
+        load_conf "$cfg"
+    done
+fi
+
+# -----------------------------
+# Detectar interfaz (zenity → dialog → CLI)
+# -----------------------------
+use_zenity=false
+use_dialog=false
+
+if command -v zenity >/dev/null 2>&1; then
+    use_zenity=true
+elif command -v dialog >/dev/null 2>&1; then
+    use_dialog=true
+fi
+
+ask_input() {
+    local prompt="$1"
+    local default="$2"
+
+    if $use_zenity; then
+        zenity --entry --title="VAS Cleanup" \
+            --text="$prompt" --entry-text="$default" || exit 1
+    elif $use_dialog; then
+        dialog --stdout --inputbox "$prompt" 10 60 "$default" || exit 1
+    else
+        read -rp "$prompt [$default]: " val
+        echo "${val:-$default}"
+    fi
+}
+
+ask_confirm() {
+    local msg="$1"
+
+    if $use_zenity; then
+        zenity --question --title="VAS Cleanup" --text="$msg" || exit 1
+    elif $use_dialog; then
+        dialog --yesno "$msg" 10 60 || exit 1
+    else
+        read -rp "$msg (y/N): " ans
+        [[ "$ans" == "y" || "$ans" == "Y" ]] || exit 1
+    fi
+}
+
+show_info() {
+    local msg="$1"
+
+    if $use_zenity; then
+        zenity --info --title="VAS Cleanup" --text="$msg"
+    elif $use_dialog; then
+        dialog --msgbox "$msg" 8 60
+    else
+        echo "$msg"
+    fi
+}
+
+# -----------------------------
+# Pedir días
+# -----------------------------
+DAYS=$(ask_input \
+    "Introduce el número de días para purgar clientes antiguos.\nValor por defecto: $TTL días" \
+    "$TTL")
+
+if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then
+    show_info "Valor inválido: $DAYS"
+    exit 1
+fi
+
+# -----------------------------
+# Confirmación
+# -----------------------------
+ask_confirm "¿Seguro que deseas eliminar clientes con last_seen > $DAYS días?\nEsta acción es irreversible."
+
+# -----------------------------
+# Ejecutar limpieza
+# -----------------------------
+python3 <<EOF
+import datetime
+import database
+import vas
+
+database.DB_PATH = "$DB_PATH"
+database.JSON_PATH = "$JSON_PATH"
+database.VERSION_FILE = "$VERSION_FILE"
+
+cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=int("$DAYS"))
+
+conn = database.get_connection()
+cur = conn.cursor()
+cur.execute("DELETE FROM clients WHERE last_seen < ?", (cutoff,))
+deleted = cur.rowcount
+conn.commit()
+conn.close()
+
+print(f"[VAS] Eliminados {deleted} clientes antiguos (> {DAYS} días).")
+
+database.regenerate_json()
+vas.sync_veyon_master()
+EOF
+
+show_info "Limpieza completada.\nLos clientes activos se re-registrarán automáticamente."
+clear
