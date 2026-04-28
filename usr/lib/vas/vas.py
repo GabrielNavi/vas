@@ -194,6 +194,8 @@ def startup_sync() -> None:
 
         # Regenerar JSON y sincronizar Veyon
         database.regenerate_json()
+        if deleted > 0:
+            database.bump_version()
         sync_veyon_master()
 
     except Exception as e:

@@ -118,6 +118,8 @@ ask_confirm "¿Seguro que deseas eliminar clientes con last_seen > $DAYS días?\
 # -----------------------------
 # Ejecutar limpieza
 # -----------------------------
+cd /usr/lib/vas
+
 python3 <<EOF
 import datetime
 import database
@@ -139,6 +141,8 @@ conn.close()
 print(f"[VAS] Eliminados {deleted} clientes antiguos (> {DAYS} días).")
 
 database.regenerate_json()
+if deleted > 0:
+    database.bump_version()
 vas.sync_veyon_master()
 EOF
 
