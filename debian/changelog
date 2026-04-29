@@ -1,3 +1,9 @@
+vx-dga-l-vas (0.4-4) unstable; urgency=medium
+
+  * Arreglo de errores de limpeza y localidad de ejecución de los scripts
+  
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
+
 vx-dga-l-vas (0.4-3) unstable; urgency=medium
 
   * Añadido soporte de subconfiguracion en /etc/vas/vas.conf.d/*.conf
