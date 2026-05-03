@@ -97,15 +97,28 @@ def regenerate_json():
 # -------------------------
 
 def get_version():
+    """Lee versión del archivo. Retorna 0 si no existe o es inválida."""
     try:
         with open(VERSION_FILE) as f:
-            return int(f.read().strip())
-    except:
+            content = f.read().strip()
+            return int(content)
+    except FileNotFoundError:
+        print(f"[VAS-DB] Aviso: archivo de versión no encontrado ({VERSION_FILE}). Usando valor 0.")
+        return 0
+    except ValueError as e:
+        print(f"[VAS-DB] Error: contenido inválido en versión file ({VERSION_FILE}): {e}. Usando valor 0.")
+        return 0
+    except IOError as e:
+        print(f"[VAS-DB] Error: no se puede leer versión file ({VERSION_FILE}): {e}. Usando valor 0.")
         return 0
 
 
 def bump_version():
+    """Genera nueva versión con timestamp UTC y la escribe al archivo."""
     version = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    with open(VERSION_FILE, "w") as f:
-        f.write(version)
+    try:
+        with open(VERSION_FILE, "w") as f:
+            f.write(version)
+    except IOError as e:
+        print(f"[VAS-DB] Error: no se puede escribir versión file ({VERSION_FILE}): {e}", flush=True)
     return version

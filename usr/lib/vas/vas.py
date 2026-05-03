@@ -63,14 +63,64 @@ database.DB_PATH = config["DB_PATH"]
 database.JSON_PATH = config["CONFIG_PATH"]
 database.VERSION_FILE = config["VERSION_FILE"]
 
+import datetime
+
+def validate_paths():
+    """Valida permisos de acceso a rutas críticas antes de startup."""
+    paths_to_check = [
+        (database.DB_PATH, "DB_PATH", True),
+        (database.JSON_PATH, "JSON_PATH", True),
+        (database.VERSION_FILE, "VERSION_FILE", True),
+        (config["VEYON_CSV_PATH"], "VEYON_CSV_PATH", True),
+    ]
+    
+    errors = []
+    for path, var_name, needs_write in paths_to_check:
+        dir_path = os.path.dirname(path)
+        if not os.path.exists(dir_path):
+            try:
+                os.makedirs(dir_path, exist_ok=True)
+                print(f"[VAS] Directorio creado: {dir_path}")
+            except OSError as e:
+                errors.append(f"{var_name} ({path}): no se puede crear directorio {dir_path}: {e}")
+                continue
+        
+        if not os.access(dir_path, os.W_OK):
+            errors.append(f"{var_name} ({path}): sin permisos de escritura en {dir_path}")
+        
+        if os.path.exists(path) and not os.access(path, os.W_OK):
+            errors.append(f"{var_name} ({path}): sin permisos de escritura en archivo")
+    
+    if errors:
+        for err in errors:
+            print(f"[VAS-ERROR] {err}", flush=True)
+        raise RuntimeError(f"Configuración inválida: {len(errors)} problemas de permisos detectados")
+    
+    print(f"[VAS] Validación de rutas completada: todas las rutas están accesibles", flush=True)
+
+try:
+    validate_paths()
+except RuntimeError as e:
+    print(f"[VAS-ERROR] FATAL: {e}", flush=True)
+    raise
+
 # Inicializar DB y versión
 database.init_db()
-
-import datetime
 
 def cleanup_old_clients(days: int) -> int:
     """Elimina clientes cuyo last_seen sea más antiguo que X días."""
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    # Contar clientes antes de eliminación
+    conn = database.get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM clients")
+    total_before = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+    
+    print(f"[VAS-CLEANUP] Iniciando limpieza: eliminando clientes no vistos después de {cutoff_str}", flush=True)
 
     conn = database.get_connection()
     cur = conn.cursor()
@@ -80,6 +130,9 @@ def cleanup_old_clients(days: int) -> int:
 
     conn.commit()
     conn.close()
+    
+    total_after = total_before - deleted
+    print(f"[VAS-CLEANUP] Completado: {deleted} cliente(s) eliminado(s), {total_after} cliente(s) restante(s)", flush=True)
 
     return deleted
 
@@ -106,11 +159,14 @@ def sync_veyon_master() -> None:
         return
 
     if shutil.which("veyon-cli") is None:
+        print(f"[VAS-VEYON] Aviso: veyon-cli no encontrado. Omitiendo sincronización.", flush=True)
         return
 
     clients = database.get_all_clients()
     csv_path = config["VEYON_CSV_PATH"]
     location = (config["VEYON_LOCATION"] or "Autoregistrados").replace(";", "")
+
+    print(f"[VAS-VEYON] Generando CSV con {len(clients)} cliente(s) para location '{location}'", flush=True)
 
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
     with open(csv_path, "w", encoding="utf-8") as f:
@@ -120,6 +176,7 @@ def sync_veyon_master() -> None:
             mac = (c.get("mac") or "").replace(";", "")
             f.write(f"computer;{hostname};{ip};{mac};{location}\n")
 
+    print(f"[VAS-VEYON] Limpiando location existente: {location}", flush=True)
     # Refrescamos solo la location administrada por VAS para no afectar otras.
     subprocess.run(
         ["veyon-cli", "networkobjects", "remove", location],
@@ -128,17 +185,25 @@ def sync_veyon_master() -> None:
         stderr=subprocess.DEVNULL,
     )
 
-    subprocess.run(
-        [
-            "veyon-cli",
-            "networkobjects",
-            "import",
-            csv_path,
-            "format",
-            "%type%;%name%;%host%;%mac%;%location%",
-        ],
-        check=True,
-    )
+    print(f"[VAS-VEYON] Importando {len(clients)} cliente(s) en Veyon", flush=True)
+    try:
+        subprocess.run(
+            [
+                "veyon-cli",
+                "networkobjects",
+                "import",
+                csv_path,
+                "format",
+                "%type%;%name%;%host%;%mac%;%location%",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        print(f"[VAS-VEYON] Sincronización completada exitosamente", flush=True)
+    except subprocess.CalledProcessError as e:
+        print(f"[VAS-ERROR] Fallo en sincronización de Veyon: {e}", flush=True)
+        raise
 
 
 @app.post("/register")
@@ -153,52 +218,70 @@ def register(client: Client):
         database.add_or_update_client(client.id, client.hostname, client.ip, mac)
 
         if changed:
+            action = "actualizado"
+            print(f"[VAS-REGISTER] Cambios detectados en cliente {client.id} ({client.hostname})", flush=True)
+            print(f"[VAS-REGISTER]   IP: {client.ip}, MAC: {mac or '(vacía)'}", flush=True)
             database.regenerate_json()
             try:
                 sync_veyon_master()
             except Exception as e:
                 # El autoregistro no debe fallar por un problema puntual de Veyon.
-                print(f"[VAS] Aviso: fallo al sincronizar con Veyon Master: {e}")
+                print(f"[VAS-ERROR] Fallo al sincronizar con Veyon Master: {e}", flush=True)
             version = database.bump_version()
+            print(f"[VAS-REGISTER] Versión actualizada a {version}", flush=True)
         else:
+            action = "sin cambios"
+            print(f"[VAS-REGISTER] Cliente {client.id} ({client.hostname}) registrado sin cambios", flush=True)
             version = database.get_version()
 
         return {"status": "ok", "version": version}
 
     except Exception as e:
+        print(f"[VAS-ERROR] Fallo en /register: {e}", flush=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/version")
 def version():
-    return {"version": database.get_version()}
+    ver = database.get_version()
+    print(f"[VAS-VERSION] Consulta de versión: {ver}", flush=True)
+    return {"version": ver}
 
 
 @app.get("/config")
 def config_file():
     try:
+        print(f"[VAS-CONFIG] Sirviendo configuración desde {config['CONFIG_PATH']}", flush=True)
         with open(config["CONFIG_PATH"]) as f:
             return json.load(f)
     except FileNotFoundError:
+        print(f"[VAS-ERROR] Archivo de configuración no encontrado: {config['CONFIG_PATH']}", flush=True)
         raise HTTPException(status_code=404, detail="Config not found")
 
 
 @app.on_event("startup")
 def startup_sync() -> None:
+    print(f"[VAS-STARTUP] Iniciando VAS en puerto {config.get('PORT', 8000)}", flush=True)
     try:
         # Limpieza automática de clientes antiguos
         ttl_days = int(config.get("CLIENT_TTL_DAYS", 30))
+        print(f"[VAS-STARTUP] TTL configurado: {ttl_days} días", flush=True)
         deleted = cleanup_old_clients(ttl_days)
-        if deleted > 0:
-            print(f"[VAS] Limpieza automática: eliminados {deleted} clientes antiguos (> {ttl_days} días).")
 
         # Regenerar JSON y sincronizar Veyon
+        print(f"[VAS-STARTUP] Regenerando JSON de configuración", flush=True)
         database.regenerate_json()
+        
         if deleted > 0:
-            database.bump_version()
+            version = database.bump_version()
+            print(f"[VAS-STARTUP] Versión actualizada a {version} por limpieza", flush=True)
+        
+        print(f"[VAS-STARTUP] Iniciando sincronización de Veyon Master", flush=True)
         sync_veyon_master()
+        
+        print(f"[VAS-STARTUP] VAS inicializado exitosamente", flush=True)
 
     except Exception as e:
-        print(f"[VAS] Aviso: fallo en startup_sync(): {e}")
+        print(f"[VAS-ERROR] Fallo en startup_sync(): {e}", flush=True)
         # No bloqueamos el arranque del servicio por fallos de integración opcional.
-        pass
+        print(f"[VAS-STARTUP] Continuando a pesar del error (integración opcional)", flush=True)
