@@ -1,3 +1,9 @@
+vx-dga-l-vas (0.5-1) unstable; urgency=medium
+
+  * Mayor Overhaul de logging para depuración de errores
+  
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 4 May 2026 10:30:00 +0200
+
 vx-dga-l-vas (0.4-4) unstable; urgency=medium
 
   * Arreglo de errores de limpeza y localidad de ejecución de los scripts
