@@ -5,40 +5,29 @@ CONFIG_FILE="/etc/vas/vas.conf"
 CONFIG_DIR="/etc/vas/vas.conf.d"
 
 TTL_DEFAULT=30
-
-# -----------------------------
-# Cargar configuración
-# -----------------------------
-TTL="$TTL_DEFAULT"
 DB_PATH="/var/lib/vas/vas.db"
-JSON_PATH="/var/lib/vas/computers.json"
 VERSION_FILE="/var/lib/vas/version"
-VEYON_CSV_PATH="/var/lib/vas/computers-master.csv"
-VEYON_LOCATION="Autoregistrados"
 
+# Parser seguro: no ejecuta código del fichero de configuración.
 load_conf() {
     local file="$1"
-    [ -f "$file" ] || return
+    [ -f "$file" ] || return 0
 
     while IFS='=' read -r key val; do
-        key="$(echo "$key" | xargs)"
-        val="$(echo "$val" | xargs | sed 's/^"//; s/"$//')"
+        key="$(echo "$key" | xargs 2>/dev/null || true)"
+        val="$(echo "$val" | xargs 2>/dev/null | sed 's/^"//; s/"$//' || true)"
+        [ -z "$key" ] && continue
 
         case "$key" in
-            CLIENT_TTL_DAYS) TTL="$val" ;;
-            DB_PATH) DB_PATH="$val" ;;
-            CONFIG_PATH) JSON_PATH="$val" ;;
-            VERSION_FILE) VERSION_FILE="$val" ;;
-            VEYON_CSV_PATH) VEYON_CSV_PATH="$val" ;;
-            VEYON_LOCATION) VEYON_LOCATION="$val" ;;
+            CLIENT_TTL_DAYS) TTL_DEFAULT="$val" ;;
+            DB_PATH)         DB_PATH="$val"     ;;
+            VERSION_FILE)    VERSION_FILE="$val" ;;
         esac
-    done < <(grep -v '^#' "$file" || true)
+    done < <(grep -v '^\s*#' "$file" | grep '=' || true)
 }
 
-# Config principal
 load_conf "$CONFIG_FILE"
 
-# Overlays
 if [ -d "$CONFIG_DIR" ]; then
     for cfg in "$CONFIG_DIR"/*.conf; do
         [ -f "$cfg" ] || continue
@@ -59,12 +48,9 @@ elif command -v dialog >/dev/null 2>&1; then
 fi
 
 ask_input() {
-    local prompt="$1"
-    local default="$2"
-
+    local prompt="$1" default="$2"
     if $use_zenity; then
-        zenity --entry --title="VAS Cleanup" \
-            --text="$prompt" --entry-text="$default" || exit 1
+        zenity --entry --title="VAS Cleanup" --text="$prompt" --entry-text="$default" || exit 1
     elif $use_dialog; then
         dialog --stdout --inputbox "$prompt" 10 60 "$default" || exit 1
     else
@@ -75,7 +61,6 @@ ask_input() {
 
 ask_confirm() {
     local msg="$1"
-
     if $use_zenity; then
         zenity --question --title="VAS Cleanup" --text="$msg" || exit 1
     elif $use_dialog; then
@@ -88,7 +73,6 @@ ask_confirm() {
 
 show_info() {
     local msg="$1"
-
     if $use_zenity; then
         zenity --info --title="VAS Cleanup" --text="$msg"
     elif $use_dialog; then
@@ -99,11 +83,11 @@ show_info() {
 }
 
 # -----------------------------
-# Pedir días y validar rango
+# Pedir días y validar
 # -----------------------------
 DAYS=$(ask_input \
-    "Introduce el número de días para purgar clientes antiguos.\nValor por defecto: $TTL días" \
-    "$TTL")
+    "Introduce el número de días para purgar clientes antiguos.\nValor por defecto: $TTL_DEFAULT días" \
+    "$TTL_DEFAULT")
 
 if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then
     show_info "Valor inválido: $DAYS (debe ser un número entero)"
@@ -115,51 +99,58 @@ if (( DAYS < 1 || DAYS > 365 )); then
     exit 1
 fi
 
-# Calcular fecha de cutoff para claridad
-CUTOFF_DATE=$(date -u -d "$DAYS days ago" "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null || date -u -v-${DAYS}d "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null || echo "hace $DAYS días")
+CUTOFF_DATE=$(date -u -d "$DAYS days ago" "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null \
+    || date -u -v-"${DAYS}"d "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null \
+    || echo "hace $DAYS días")
 
-# -----------------------------
-# Confirmación
-# -----------------------------
 ask_confirm "¿Seguro que deseas eliminar clientes no vistos después de $CUTOFF_DATE?\nEsta acción es irreversible."
 
 # -----------------------------
 # Ejecutar limpieza
+# Usamos <<'PYEOF' (comilla simple) para evitar interpolación de shell.
+# Las rutas se pasan como variables de entorno.
 # -----------------------------
-echo "[CLEANUP] Ejecutando limpieza de clientes no vistos en más de $DAYS días..." >&2
+echo "[CLEANUP] Eliminando clientes no vistos en más de $DAYS días..." >&2
 
-python3 <<EOF
+CLEANUP_DAYS="$DAYS" \
+VAS_DB_PATH="$DB_PATH" \
+VAS_VERSION_FILE="$VERSION_FILE" \
+python3 <<'PYEOF'
+import os
 import datetime
-import database
-import vas
+import sqlite3
 
-database.DB_PATH = "$DB_PATH"
-database.JSON_PATH = "$JSON_PATH"
-database.VERSION_FILE = "$VERSION_FILE"
+days         = int(os.environ["CLEANUP_DAYS"])
+db_path      = os.environ["VAS_DB_PATH"]
+version_file = os.environ["VAS_VERSION_FILE"]
 
-cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=int("$DAYS"))
+cutoff     = datetime.datetime.utcnow() - datetime.timedelta(days=days)
 cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
 
-print(f"[CLEANUP] Cutoff: {cutoff_str} | Eliminando clientes con last_seen anterior a esta fecha", flush=True)
+print(f"[CLEANUP] Cutoff: {cutoff_str}", flush=True)
 
-conn = database.get_connection()
-cur = conn.cursor()
+conn = sqlite3.connect(db_path)
+cur  = conn.cursor()
+
 cur.execute("SELECT COUNT(*) FROM clients")
 total_before = cur.fetchone()[0]
+
 cur.execute("DELETE FROM clients WHERE last_seen < ?", (cutoff,))
 deleted = cur.rowcount
 conn.commit()
 conn.close()
 
 total_after = total_before - deleted
-print(f"[CLEANUP] Completado: {deleted} cliente(s) eliminado(s), {total_after} cliente(s) restante(s)", flush=True)
+print(f"[CLEANUP] {deleted} cliente(s) eliminado(s), {total_after} restante(s).", flush=True)
 
-database.regenerate_json()
 if deleted > 0:
-    version = database.bump_version()
-    print(f"[CLEANUP] Versión actualizada a {version}", flush=True)
-vas.sync_veyon_master()
-EOF
+    version = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    tmp = version_file + ".tmp"
+    with open(tmp, "w") as f:
+        f.write(version)
+    os.replace(tmp, version_file)
+    print(f"[CLEANUP] Versión actualizada a {version}.", flush=True)
+    print("[CLEANUP] veyon-sync detectará el cambio en su próximo ciclo.", flush=True)
+PYEOF
 
-show_info "Limpieza completada.\nLos clientes activos se re-registrarán automáticamente."
-clear
+show_info "Limpieza completada.\nLos clientes activos se re-registrarán automáticamente.\nSi tienes vx-dga-l-veyon-sync instalado, actualizará Veyon en el próximo ciclo."
