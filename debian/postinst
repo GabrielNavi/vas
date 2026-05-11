@@ -3,19 +3,23 @@ set -e
 
 echo "[VAS] Ejecutando postinst..."
 
-# Crear directorios persistentes
+# Crear usuario de sistema si no existe
+if ! getent passwd _vas > /dev/null 2>&1; then
+    adduser --system --no-create-home --group _vas
+fi
+
+# Crear directorios persistentes con permisos correctos
 mkdir -p /var/lib/vas
 mkdir -p /var/log/vas
 mkdir -p /etc/vas/vas.conf.d
 
-# Crear JSON inicial si no existe
-if [ ! -f /var/lib/vas/computers.json ]; then
-    echo '{"computers": []}' > /var/lib/vas/computers.json
-fi
+chown -R _vas:_vas /var/lib/vas
+chown -R _vas:_vas /var/log/vas
 
 # Crear archivo de versión si no existe
 if [ ! -f /var/lib/vas/version ]; then
     echo "0" > /var/lib/vas/version
+    chown _vas:_vas /var/lib/vas/version
 fi
 
 # Recargar systemd
@@ -34,4 +38,3 @@ if [ "$1" = "configure" ]; then
 fi
 
 echo "[VAS] Instalación completada."
-

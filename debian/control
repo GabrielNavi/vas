@@ -9,7 +9,8 @@ Package: vx-dga-l-vas
 Architecture: all
 Depends: python3, python3-fastapi, python3-uvicorn, python3-pydantic
 Description: Servidor de Autorregistro de Vitalinux (VAS)
- Un servicio ligero HTTP+SQLite que autorregistra clientes Veyon
- y genera automáticamente la configuración computers.json de Veyon.
- Este paquete instala un servidor basado en FastAPI, un servicio systemd,
- y la estructura de directorios necesaria bajo /usr, /etc y /var.
+ Servicio HTTP+SQLite que mantiene un inventario en tiempo real de los
+ equipos de la red: hostname, IP, MAC y última vez visto. Expone una API
+ REST consumible por cualquier servicio (Veyon, LDAP, monitorización...).
+ La integración con Veyon se gestiona mediante el paquete opcional
+ vx-dga-l-veyon-sync.

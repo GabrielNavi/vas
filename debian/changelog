@@ -1,3 +1,19 @@
+vx-dga-l-vas (0.6-1) unstable; urgency=medium
+
+  * Desacoplamiento completo de Veyon: sync_veyon_master() y
+    regenerate_json() eliminados del núcleo.
+  * Nuevo endpoint GET /clients con last_seen en ISO-8601.
+  * Nuevo endpoint GET /clients/{id} para consulta individual.
+  * /config eliminado; /clients es el endpoint canónico.
+  * get_version() y bump_version() consistentes como str.
+  * cleanup_old_clients usa una sola transacción SQLite.
+  * Lifespan moderno en lugar de @app.on_event deprecado.
+  * vas.service corre como usuario dedicado _vas.
+  * vas.conf simplificado: solo PORT, DB_PATH, CLIENT_TTL_DAYS.
+  * La integración Veyon se delega a vx-dga-l-veyon-sync.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 12:00:00 +0200
+
 vx-dga-l-vas (0.5-1) unstable; urgency=medium
 
   * Mayor Overhaul de logging para depuración de errores

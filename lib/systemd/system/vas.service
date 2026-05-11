@@ -6,7 +6,8 @@ After=network.target
 WorkingDirectory=/usr/lib/vas
 ExecStart=/usr/bin/vas
 Restart=always
-User=root
+User=_vas
+Group=_vas
 
 [Install]
 WantedBy=multi-user.target

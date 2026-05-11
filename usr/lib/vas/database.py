@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 import sqlite3
-import json
 import os
 import datetime
 
-# Estas variables serán inyectadas por vas.py
+# Inyectadas por vas.py antes del primer uso
 DB_PATH = None
-JSON_PATH = None
 VERSION_FILE = None
 
 
@@ -32,8 +30,8 @@ def init_db():
     conn.commit()
     conn.close()
 
-    # Inicializar versión si no existe
     if not os.path.exists(VERSION_FILE):
+        os.makedirs(os.path.dirname(VERSION_FILE), exist_ok=True)
         with open(VERSION_FILE, "w") as f:
             f.write("0")
 
@@ -46,7 +44,7 @@ def client_has_changed(client_id, hostname, ip, mac):
     conn.close()
 
     if row is None:
-        return True  # nuevo cliente
+        return True
 
     old_hostname, old_ip, old_mac = row
     return (hostname != old_hostname) or (ip != old_ip) or (mac != old_mac)
@@ -73,52 +71,54 @@ def add_or_update_client(client_id, hostname, ip, mac):
 def get_all_clients():
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT id, hostname, ip, mac FROM clients")
+    cur.execute("SELECT id, hostname, ip, mac, last_seen FROM clients")
     rows = cur.fetchall()
     conn.close()
 
     return [
-        {"id": r[0], "hostname": r[1], "ip": r[2], "mac": r[3]}
+        {
+            "id": r[0],
+            "hostname": r[1],
+            "ip": r[2],
+            "mac": r[3],
+            "last_seen": r[4],
+        }
         for r in rows
     ]
 
 
-def regenerate_json():
-    clients = get_all_clients()
-    data = {"computers": clients}
+def get_client(client_id):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, hostname, ip, mac, last_seen FROM clients WHERE id=?", (client_id,))
+    row = cur.fetchone()
+    conn.close()
 
-    os.makedirs(os.path.dirname(JSON_PATH), exist_ok=True)
-    with open(JSON_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    if row is None:
+        return None
+
+    return {"id": row[0], "hostname": row[1], "ip": row[2], "mac": row[3], "last_seen": row[4]}
 
 
-# -------------------------
-# Gestión de versión
-# -------------------------
-
-def get_version():
-    """Lee versión del archivo. Retorna 0 si no existe o es inválida."""
+def get_version() -> str:
     try:
         with open(VERSION_FILE) as f:
-            content = f.read().strip()
-            return int(content)
+            return f.read().strip()
     except FileNotFoundError:
-        print(f"[VAS-DB] Aviso: archivo de versión no encontrado ({VERSION_FILE}). Usando valor 0.")
-        return 0
-    except ValueError as e:
-        print(f"[VAS-DB] Error: contenido inválido en versión file ({VERSION_FILE}): {e}. Usando valor 0.")
-        return 0
+        print(f"[VAS-DB] Aviso: archivo de versión no encontrado ({VERSION_FILE}). Usando 0.")
+        return "0"
     except IOError as e:
-        print(f"[VAS-DB] Error: no se puede leer versión file ({VERSION_FILE}): {e}. Usando valor 0.")
-        return 0
+        print(f"[VAS-DB] Error: no se puede leer versión ({VERSION_FILE}): {e}. Usando 0.")
+        return "0"
 
 
-def bump_version():
-    """Genera nueva versión con timestamp UTC y la escribe al archivo."""
+def bump_version() -> str:
     version = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    tmp = VERSION_FILE + ".tmp"
     try:
-        with open(VERSION_FILE, "w") as f:
+        with open(tmp, "w") as f:
             f.write(version)
+        os.replace(tmp, VERSION_FILE)
     except IOError as e:
-        print(f"[VAS-DB] Error: no se puede escribir versión file ({VERSION_FILE}): {e}", flush=True)
+        print(f"[VAS-DB] Error: no se puede escribir versión ({VERSION_FILE}): {e}", flush=True)
     return version
