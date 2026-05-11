@@ -1,111 +1,106 @@
-# vx-dga-l-vas
+# vx-dga-l-vas — Vitalinux Autoregistration Server
 
-Paquete Debian para Vitalinux que instala Vitalinux Autoregistration Server (VAS) de forma global.
+Paquete Debian para Vitalinux que instala el servidor de inventario de red (VAS).
 
-## Descripcion
+## Descripción
 
-Este paquete instala VAS en el sistema para su despliegue mediante Migasfree en entornos Vitalinux. VAS expone una API HTTP basada en FastAPI, almacena clientes en SQLite y genera automáticamente el archivo computers.json de Veyon para que los clientes VAC puedan sincronizar la configuración.
+VAS mantiene un registro en tiempo real de los equipos presentes en la red: UUID persistente, hostname, IP, MAC y última vez visto (`last_seen`). Expone una API REST consumible por cualquier servicio: clientes VAC, sincronizadores Veyon, sistemas LDAP, herramientas de monitorización, etc.
 
-Adicionalmente, VAS puede sincronizar automáticamente los networkobjects en un Veyon Master mediante veyon-cli.
+La integración con Veyon es **opcional y externa**: el paquete `vx-dga-l-veyon-sync` actúa como consumidor independiente del registro, sin que VAS conozca ni dependa de Veyon.
+
+## Ecosistema
+
+```
+vx-dga-l-vas          → registro canónico (este paquete)
+vx-dga-l-vac          → cliente de autoregistro (cada equipo)
+vx-dga-l-veyon-sync   → integración Veyon opcional
+```
 
 ## Requisitos
 
-- Sistema Vitalinux compatible con paquetes Debian.
-- Python 3 en tiempo de ejecución.
-- Dependencias Python de sistema:
-  - python3-fastapi
-  - python3-uvicorn
-  - python3-pydantic
-- systemd para gestión del servicio.
+- Python 3 con `python3-fastapi`, `python3-uvicorn`, `python3-pydantic`
+- systemd
 
-- Sincronización con VEYON depende de tener disponible veyon-cli instalado
+## Información del paquete
 
-## Informacion del Paquete
-
-- Nombre: vx-dga-l-vas
-- Version: 0.4-3
+- Nombre: `vx-dga-l-vas`
+- Versión: 0.6-2
 - Arquitectura: all
-- Mantenedor: Gabriel Navia <correos@gabrielnav.es>
+- Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: GPL-3.0+
 
-## Archivos incluidos
+## Archivos instalados
 
-- usr/lib/vas/vas.py - Aplicación principal FastAPI
-- usr/lib/vas/database.py - Capa de persistencia SQLite y generación de JSON
-- usr/bin/vas - Script wrapper de arranque
-- etc/vas/vas.conf - Configuración editable del servicio
-- lib/systemd/system/vas.service - Unidad systemd de VAS
-- debian/postinst - Inicialización de datos y habilitación/arranque del servicio
-- debian/prerm - Parada y deshabilitación del servicio al eliminar
-- debian/postrm - Limpieza de datos persistentes en purge
+| Ruta | Descripción |
+|---|---|
+| `usr/lib/vas/vas.py` | Aplicación FastAPI principal |
+| `usr/lib/vas/database.py` | Capa de persistencia SQLite |
+| `usr/bin/vas` | Wrapper de arranque (extrae PORT, lanza uvicorn) |
+| `usr/bin/vas-cleanup` | Herramienta interactiva de limpieza manual |
+| `etc/vas/vas.conf` | Configuración editable |
+| `lib/systemd/system/vas.service` | Unidad systemd |
 
-## Funcionamiento de VAS
+## API
 
-VAS implementa un flujo simple y robusto de autoregistro:
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `POST` | `/register` | Registra o actualiza un cliente. Retorna `{status, version}`. |
+| `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSS`). |
+| `GET` | `/clients` | Lista completa: `{clients: [{id, hostname, ip, mac, last_seen}]}` |
+| `GET` | `/clients/{id}` | Cliente individual por UUID. 404 si no existe. |
 
-1. Arranque
-   - systemd ejecuta usr/bin/vas.
-   - El wrapper carga etc/vas/vas.conf y levanta Uvicorn sobre vas:app.
-   - La aplicación inicializa la base de datos SQLite y la versión local.
+La versión solo se incrementa cuando cambian datos reales de algún cliente. Los heartbeats periódicos de VAC actualizan `last_seen` sin modificar la versión.
 
-2. Registro de clientes
-   - Endpoint: POST /register
-   - VAC envía id (UUID persistente), hostname, ip y mac.
-   - VAS inserta o actualiza el cliente por UUID (sin usar MAC como clave primaria).
+## Flujo de arranque
 
-3. Regeneración de configuración
-   - Si cambia un cliente o aparece uno nuevo, VAS regenera /var/lib/vas/computers.json.
-   - VAS incrementa la versión de configuración para que los clientes detecten cambios.
+```
+load_config()         → /etc/vas/vas.conf + /etc/vas/vas.conf.d/*.conf
+validate_paths()      → crea /var/lib/vas si falta; FATAL si sin permisos
+database.init_db()    → CREATE TABLE IF NOT EXISTS clients
+lifespan (startup):
+  cleanup_old_clients(CLIENT_TTL_DAYS)
+    → DELETE WHERE last_seen < (ahora - TTL)
+    → si eliminados > 0: bump_version()
+[endpoints activos]
+```
 
-4. Sincronización opcional con Veyon Master
-   - Si VEYON_MASTER_SYNC=1 y existe veyon-cli, VAS genera un CSV y actualiza la location gestionada.
-   - Se ejecuta en arranque y tras cambios de clientes.
-   - La sincronización no bloquea el autoregistro si hay un fallo puntual de Veyon.
+## Limpieza automática (TTL)
 
-5. Publicación de estado
-   - Endpoint: GET /version devuelve la versión actual.
-   - Endpoint: GET /config devuelve el JSON de configuración para VAC.
+VAS elimina clientes inactivos en cada arranque según `CLIENT_TTL_DAYS`. Un cliente activo que ejecute VAC cada `CHECK_SECONDS` nunca será purgado (relación de seguridad: `CHECK_SECONDS << CLIENT_TTL_DAYS × 86400`).
+
+## Limpieza manual (`vas-cleanup`)
+
+Herramienta interactiva con interfaz Zenity, dialog o terminal. Pide confirmación, elimina clientes más antiguos que N días y actualiza la versión. `vx-dga-l-veyon-sync` detectará el cambio en su siguiente ciclo.
+
+## Configuración
+
+Fichero principal: `/etc/vas/vas.conf`  
+Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
+
+| Variable | Defecto | Descripción |
+|---|---|---|
+| `PORT` | `8000` | Puerto HTTP de escucha |
+| `DB_PATH` | `/var/lib/vas/vas.db` | Base de datos SQLite |
+| `VERSION_FILE` | `/var/lib/vas/version` | Fichero de versión |
+| `CLIENT_TTL_DAYS` | `30` | Días de inactividad antes de purgar un cliente |
+
+> `CLIENT_TTL_DAYS` debe ser notablemente mayor que `CHECK_SECONDS` de los clientes VAC. Con `CHECK_SECONDS=300`, cualquier valor superior a 1 día es seguro.
+
+## Seguridad
+
+- El servicio corre como usuario dedicado `_vas` (sin shell, sin home).
+- El parser de configuración no ejecuta código: usa `split("=", 1)` + strip de comillas.
 
 ## Servicio systemd
 
-- Nombre del servicio: vas.service
-- Comandos de operación habituales:
-  - sudo systemctl status vas
-  - sudo systemctl restart vas
-  - sudo journalctl -u vas -f
+```bash
+systemctl status vas
+systemctl restart vas
+journalctl -u vas -f
+```
 
-## Configuracion
+## Construcción del paquete
 
-Archivo de configuración: etc/vas/vas.conf
-
-Sobreescrituras por subconfiguración: /etc/vas/vas.conf.d/*.conf
-
-El orden de carga es:
-1. /etc/vas/vas.conf
-2. /etc/vas/vas.conf.d/*.conf (orden lexical)
-
-Variables principales:
-
-- PORT: puerto HTTP del servicio
-- DB_PATH: ruta de la base de datos SQLite
-- CONFIG_PATH: ruta del computers.json generado
-- VERSION_FILE: ruta del fichero de versión de configuración
-- VEYON_MASTER_SYNC: habilita sincronización de networkobjects en master (1/0)
-- VEYON_LOCATION: location administrada por VAS en Veyon
-- VEYON_CSV_PATH: ruta del CSV temporal para importación
-
-Ejemplo típico:
-
-PORT=8000
-DB_PATH=/var/lib/vas/vas.db
-CONFIG_PATH=/var/lib/vas/computers.json
-VERSION_FILE=/var/lib/vas/version
-VEYON_MASTER_SYNC=1
-VEYON_LOCATION=Autoregistrados
-VEYON_CSV_PATH=/var/lib/vas/computers-master.csv
-
-## Construccion del paquete
-
-Desde este directorio:
-
+```bash
 dpkg-buildpackage -us -uc -b
+```
