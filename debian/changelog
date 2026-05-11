@@ -1,3 +1,21 @@
+vx-dga-l-vas (0.6-3) unstable; urgency=low
+
+  * Añadidos docstrings y logging extensivo en vas.py y database.py
+    para depuración con journalctl -u vas -f:
+    - load_config: informa claves cargadas por fichero y overlays encontrados.
+    - validate_paths: OK o error explícito por cada ruta.
+    - cleanup_old_clients: total antes, cutoff, eliminados, restantes.
+    - lifespan: startup con config efectiva, versión publicada tras limpieza,
+      "Listo para recibir peticiones" y shutdown.
+    - POST /register: NUEVO/CAMBIO vs HEARTBEAT con todos los campos y versión.
+    - GET /version: registra cada consulta.
+    - GET /clients: registra número de equipos servidos.
+    - GET /clients/{id}: encontrado (con hostname/ip) o no encontrado.
+    - database: client_has_changed con diffs campo a campo (old → new);
+      add_or_update_client distingue "insertado" de "actualizado".
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 15:00:00 +0200
+
 vx-dga-l-vas (0.6-2) unstable; urgency=medium
 
   * Corregido wrapper /usr/bin/vas: sustituido source/punto por parser
