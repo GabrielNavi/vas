@@ -3,25 +3,31 @@ set -e
 
 # Lanzador del servidor VAS usando dependencias del sistema.
 # Permite sobrescribir el puerto desde /etc/vas/vas.conf.
+
 PORT=8000
 CONF_FILE=/etc/vas/vas.conf
 CONF_DIR=/etc/vas/vas.conf.d
 
-if [ -f "$CONF_FILE" ]; then
-	# Carga variables como PORT=NNNN desde el archivo de configuracion.
-	# shellcheck disable=SC1090
-	. "$CONF_FILE"
-fi
+# Parser seguro: extrae PORT sin ejecutar código del fichero de configuración.
+load_port() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    while IFS='=' read -r key val; do
+        key="$(echo "$key" | tr -d ' \t')"
+        val="$(echo "$val" | tr -d ' \t"'"'"')"
+        [ "$key" = "PORT" ] && PORT="$val"
+    done < <(grep -v '^\s*#' "$file" | grep '=' || true)
+}
 
-# Carga sobreescrituras desde /etc/vas/vas.conf.d/*.conf en orden lexical.
+load_port "$CONF_FILE"
+
 if [ -d "$CONF_DIR" ]; then
-	for cfg in "$CONF_DIR"/*.conf; do
-		[ -f "$cfg" ] || continue
-		# shellcheck disable=SC1090
-		. "$cfg"
-	done
+    for cfg in "$CONF_DIR"/*.conf; do
+        [ -f "$cfg" ] || continue
+        load_port "$cfg"
+    done
 fi
 
 cd /usr/lib/vas
 
-exec /usr/bin/python3 -m uvicorn vas:app --host 0.0.0.0 --port "${PORT:-8000}"
+exec /usr/bin/python3 -m uvicorn vas:app --host 0.0.0.0 --port "${PORT}"

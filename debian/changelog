@@ -1,3 +1,12 @@
+vx-dga-l-vas (0.6-2) unstable; urgency=medium
+
+  * Corregido wrapper /usr/bin/vas: sustituido source/punto por parser
+    seguro (grep + IFS read) para extraer PORT. Elimina el último punto
+    del sistema donde un fichero de configuración podía ejecutar código
+    arbitrario de shell.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 14:00:00 +0200
+
 vx-dga-l-vas (0.6-1) unstable; urgency=medium
 
   * Desacoplamiento completo de Veyon: sync_veyon_master() y
