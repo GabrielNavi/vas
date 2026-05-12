@@ -238,11 +238,19 @@ app = FastAPI(lifespan=lifespan)
 # ---------------------------------------------------------------------------
 
 class Client(BaseModel):
-    """Representación de un cliente VAC en el cuerpo de POST /register."""
-    id:       str
-    hostname: str
-    ip:       str
-    mac:      Optional[str] = None
+    """
+    Representación de un cliente VAC en el cuerpo de POST /register.
+
+    extra_imperative  → dict arbitrario; los cambios disparan bump_version.
+    extra_informative → dict arbitrario; nunca dispara versión (solo informativo).
+    Ambos son opcionales y null-seguros.
+    """
+    id:                str
+    hostname:          str
+    ip:                str
+    mac:               Optional[str]  = None
+    extra_imperative:  Optional[dict] = None
+    extra_informative: Optional[dict] = None
 
 
 # ---------------------------------------------------------------------------
@@ -262,8 +270,15 @@ def register(client: Client):
     try:
         mac = client.mac or ""
 
-        changed = database.client_has_changed(client.id, client.hostname, client.ip, mac)
-        database.add_or_update_client(client.id, client.hostname, client.ip, mac)
+        changed = database.client_has_changed(
+            client.id, client.hostname, client.ip, mac,
+            extra_imperative=client.extra_imperative,
+        )
+        database.add_or_update_client(
+            client.id, client.hostname, client.ip, mac,
+            extra_imperative=client.extra_imperative,
+            extra_informative=client.extra_informative,
+        )
 
         if changed:
             version = database.bump_version()

@@ -15,6 +15,7 @@ Los consumidores normales (VAC, veyon-sync) solo ven clientes 'active'.
 El paso a 'inactive' sube versión para que los consumidores lo detecten.
 Un cliente inactivo vuelve a 'active' automáticamente al hacer heartbeat.
 """
+import json
 import sqlite3
 import os
 import datetime
@@ -50,21 +51,28 @@ def init_db():
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS clients (
-            id        TEXT PRIMARY KEY,
-            hostname  TEXT,
-            ip        TEXT,
-            mac       TEXT,
-            status    TEXT DEFAULT 'active',
-            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            id                 TEXT PRIMARY KEY,
+            hostname           TEXT,
+            ip                 TEXT,
+            mac                TEXT,
+            status             TEXT DEFAULT 'active',
+            extra_imperative   TEXT,
+            extra_informative  TEXT,
+            last_seen          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
 
-    # Migración: añadir columna status si la tabla ya existía sin ella
+    # Migraciones: añadir columnas nuevas si la tabla viene de versiones anteriores
     cur.execute("PRAGMA table_info(clients)")
     cols = [row[1] for row in cur.fetchall()]
-    if "status" not in cols:
-        cur.execute("ALTER TABLE clients ADD COLUMN status TEXT DEFAULT 'active'")
-        print("[VAS-DB] Migración: columna 'status' añadida.", flush=True)
+    for col, definition in [
+        ("status",            "TEXT DEFAULT 'active'"),
+        ("extra_imperative",  "TEXT"),
+        ("extra_informative", "TEXT"),
+    ]:
+        if col not in cols:
+            cur.execute(f"ALTER TABLE clients ADD COLUMN {col} {definition}")
+            print(f"[VAS-DB] Migración: columna '{col}' añadida.", flush=True)
 
     conn.commit()
     conn.close()
@@ -84,17 +92,43 @@ def init_db():
         print(f"[VAS-DB] Versión actual al arrancar: {current}", flush=True)
 
 
-def client_has_changed(client_id: str, hostname: str, ip: str, mac: str) -> bool:
+def _serialize_extra(extra: dict | None) -> str | None:
+    """
+    Serializa un dict de extra a JSON compacto con claves ordenadas.
+
+    Orden determinista para que la comparación de string funcione correctamente
+    aunque el emisor varíe el orden de las claves entre ciclos.
+    Devuelve None si extra es None o vacío.
+    """
+    if not extra:
+        return None
+    return json.dumps(extra, sort_keys=True, separators=(",", ":"))
+
+
+def client_has_changed(
+    client_id: str,
+    hostname: str,
+    ip: str,
+    mac: str,
+    extra_imperative: dict | None = None,
+) -> bool:
     """
     Comprueba si los datos enviados difieren de los almacenados.
 
-    Devuelve True si el cliente es nuevo, si hostname/ip/mac cambiaron,
-    o si el cliente estaba inactivo/archivado (reactivación cuenta como cambio
-    para que los consumidores vean al equipo de nuevo en el inventario).
+    Dispara cambio (→ sube versión) si:
+    - El cliente es nuevo.
+    - hostname, ip o mac han cambiado.
+    - El cliente estaba inactivo/archivado (reactivación).
+    - extra_imperative ha cambiado (comparación de blob JSON normalizado).
+
+    extra_informative nunca dispara versión: es puramente informativo.
     """
     conn = get_connection()
     cur  = conn.cursor()
-    cur.execute("SELECT hostname, ip, mac, status FROM clients WHERE id=?", (client_id,))
+    cur.execute(
+        "SELECT hostname, ip, mac, status, extra_imperative FROM clients WHERE id=?",
+        (client_id,),
+    )
     row = cur.fetchone()
     conn.close()
 
@@ -102,7 +136,7 @@ def client_has_changed(client_id: str, hostname: str, ip: str, mac: str) -> bool
         print(f"[VAS-DB] Cliente nuevo: {client_id}", flush=True)
         return True
 
-    old_hostname, old_ip, old_mac, old_status = row
+    old_hostname, old_ip, old_mac, old_status, old_extra_imp = row
     changes = []
 
     if hostname != old_hostname:
@@ -114,6 +148,10 @@ def client_has_changed(client_id: str, hostname: str, ip: str, mac: str) -> bool
     if old_status != "active":
         changes.append(f"status: '{old_status}' → 'active' (reactivación)")
 
+    new_extra_imp = _serialize_extra(extra_imperative)
+    if new_extra_imp != old_extra_imp:
+        changes.append("extra_imperative cambió")
+
     if changes:
         print(f"[VAS-DB] Cambios en {client_id}: {', '.join(changes)}", flush=True)
         return True
@@ -121,26 +159,41 @@ def client_has_changed(client_id: str, hostname: str, ip: str, mac: str) -> bool
     return False
 
 
-def add_or_update_client(client_id: str, hostname: str, ip: str, mac: str) -> None:
+def add_or_update_client(
+    client_id: str,
+    hostname: str,
+    ip: str,
+    mac: str,
+    extra_imperative: dict | None = None,
+    extra_informative: dict | None = None,
+) -> None:
     """
     Inserta o actualiza un cliente en la base de datos (upsert por id).
 
     Siempre actualiza last_seen y restaura status a 'active'.
     Esto reactiva automáticamente clientes que estaban inactivos o archivados.
+    extra_imperative y extra_informative se almacenan como JSON compacto con
+    claves ordenadas para que la comparación de string en client_has_changed
+    sea determinista.
     """
     conn = get_connection()
     cur  = conn.cursor()
 
+    ei  = _serialize_extra(extra_imperative)
+    einf = _serialize_extra(extra_informative)
+
     cur.execute("""
-        INSERT INTO clients (id, hostname, ip, mac, status)
-        VALUES (?, ?, ?, ?, 'active')
+        INSERT INTO clients (id, hostname, ip, mac, status, extra_imperative, extra_informative)
+        VALUES (?, ?, ?, ?, 'active', ?, ?)
         ON CONFLICT(id) DO UPDATE SET
-            hostname  = excluded.hostname,
-            ip        = excluded.ip,
-            mac       = excluded.mac,
-            status    = 'active',
-            last_seen = CURRENT_TIMESTAMP
-    """, (client_id, hostname, ip, mac))
+            hostname          = excluded.hostname,
+            ip                = excluded.ip,
+            mac               = excluded.mac,
+            status            = 'active',
+            extra_imperative  = excluded.extra_imperative,
+            extra_informative = excluded.extra_informative,
+            last_seen         = CURRENT_TIMESTAMP
+    """, (client_id, hostname, ip, mac, ei, einf))
 
     action = "insertado" if cur.lastrowid and cur.rowcount == 1 else "actualizado"
     conn.commit()
@@ -165,11 +218,13 @@ def get_all_clients(status: str = "active") -> list:
 
     if status == "all":
         cur.execute(
-            "SELECT hostname, ip, mac, status, last_seen FROM clients ORDER BY hostname"
+            "SELECT hostname, ip, mac, status, last_seen, extra_imperative, extra_informative"
+            " FROM clients ORDER BY hostname"
         )
     else:
         cur.execute(
-            "SELECT hostname, ip, mac, status, last_seen FROM clients WHERE status=? ORDER BY hostname",
+            "SELECT hostname, ip, mac, status, last_seen, extra_imperative, extra_informative"
+            " FROM clients WHERE status=? ORDER BY hostname",
             (status,),
         )
 
@@ -178,13 +233,21 @@ def get_all_clients(status: str = "active") -> list:
 
     # El UUID no se incluye en el listado público: principio de mínima exposición.
     # Solo GET /clients/{id} lo devuelve, y quien lo consulta ya lo conoce.
+    def _parse(blob):
+        try:
+            return json.loads(blob) if blob else None
+        except Exception:
+            return None
+
     return [
         {
-            "hostname":  r[0],
-            "ip":        r[1],
-            "mac":       r[2],
-            "status":    r[3],
-            "last_seen": r[4],
+            "hostname":          r[0],
+            "ip":                r[1],
+            "mac":               r[2],
+            "status":            r[3],
+            "last_seen":         r[4],
+            "extra_imperative":  _parse(r[5]),
+            "extra_informative": _parse(r[6]),
         }
         for r in rows
     ]
@@ -198,7 +261,8 @@ def get_client(client_id: str) -> dict | None:
     conn = get_connection()
     cur  = conn.cursor()
     cur.execute(
-        "SELECT id, hostname, ip, mac, status, last_seen FROM clients WHERE id=?",
+        "SELECT id, hostname, ip, mac, status, last_seen, extra_imperative, extra_informative"
+        " FROM clients WHERE id=?",
         (client_id,),
     )
     row = cur.fetchone()
@@ -207,13 +271,21 @@ def get_client(client_id: str) -> dict | None:
     if row is None:
         return None
 
+    def _parse(blob):
+        try:
+            return json.loads(blob) if blob else None
+        except Exception:
+            return None
+
     return {
-        "id":        row[0],
-        "hostname":  row[1],
-        "ip":        row[2],
-        "mac":       row[3],
-        "status":    row[4],
-        "last_seen": row[5],
+        "id":                row[0],
+        "hostname":          row[1],
+        "ip":                row[2],
+        "mac":               row[3],
+        "status":            row[4],
+        "last_seen":         row[5],
+        "extra_imperative":  _parse(row[6]),
+        "extra_informative": _parse(row[7]),
     }
 
 

@@ -1,3 +1,17 @@
+vx-dga-l-vas (0.8-1) unstable; urgency=medium
+
+  * Campos extra extensibles en POST /register:
+    - extra_imperative  (dict, opcional): cambios disparan bump_version.
+    - extra_informative (dict, opcional): solo informativo, nunca sube versión.
+  * database.py: _serialize_extra() normaliza JSON (sort_keys, separadores compactos)
+    para comparación determinista entre ciclos aunque el emisor varíe el orden de claves.
+    add_or_update_client() almacena ambos extras como JSON compacto.
+    get_all_clients() y get_client() deserializan los blobs al devolver los datos.
+  * vas.py: modelo Client ampliado con extra_imperative y extra_informative (Optional[dict]).
+    register endpoint pasa ambos extras a client_has_changed() y add_or_update_client().
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 17:00:00 +0200
+
 vx-dga-l-vas (0.7-2) unstable; urgency=medium
 
   * GET /clients elimina el UUID de la respuesta (mínima exposición de datos).
