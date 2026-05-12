@@ -6,17 +6,23 @@ Servidor FastAPI que mantiene el inventario de red de equipos Vitalinux.
 Expone una API REST consumible por cualquier servicio (VAC, veyon-sync, etc.).
 
 Endpoints:
-  POST /register       → registra o actualiza un cliente; retorna versión actual
-  GET  /version        → versión del registro (YYYYMMDDHHMMSS)
-  GET  /clients        → listado completo con last_seen
-  GET  /clients/{id}   → cliente individual por UUID
+  POST /register            → registra o actualiza un cliente; retorna versión actual
+  GET  /version             → versión del registro (YYYYMMDDHHMMSS)
+  GET  /clients             → clientes activos (default) o filtrados por ?status=
+  GET  /clients/{id}        → cliente individual por UUID
+
+Ciclo de vida de clientes (gestionado en startup y por vas-cleanup):
+  active   → registrándose normalmente
+  inactive → sin heartbeat desde TTL_INACTIVE_DAYS días (sube versión)
+  archived → sin heartbeat desde TTL_ARCHIVE_DAYS días (histórico)
+  (purge)  → eliminación definitiva tras TTL_PURGE_DAYS (0 = nunca)
 """
 import os
 import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 import database
@@ -41,10 +47,12 @@ def load_config() -> dict:
     Devuelve un diccionario con los valores efectivos.
     """
     cfg = {
-        "PORT":            "8000",
-        "DB_PATH":         "/var/lib/vas/vas.db",
-        "VERSION_FILE":    "/var/lib/vas/version",
-        "CLIENT_TTL_DAYS": "30",
+        "PORT":               "8000",
+        "DB_PATH":            "/var/lib/vas/vas.db",
+        "VERSION_FILE":       "/var/lib/vas/version",
+        "TTL_INACTIVE_DAYS":  "30",
+        "TTL_ARCHIVE_DAYS":   "90",
+        "TTL_PURGE_DAYS":     "365",
     }
 
     def _apply_file(path: str) -> None:
@@ -86,7 +94,10 @@ database.VERSION_FILE = config["VERSION_FILE"]
 
 print(
     f"[VAS-CONFIG] Configuración efectiva: "
-    f"PORT={config['PORT']} DB={config['DB_PATH']} TTL={config['CLIENT_TTL_DAYS']}d",
+    f"PORT={config['PORT']} DB={config['DB_PATH']} "
+    f"TTL_INACTIVE={config['TTL_INACTIVE_DAYS']}d "
+    f"TTL_ARCHIVE={config['TTL_ARCHIVE_DAYS']}d "
+    f"TTL_PURGE={config['TTL_PURGE_DAYS']}d",
     flush=True,
 )
 
@@ -100,8 +111,7 @@ def validate_paths() -> None:
     Verifica que los directorios de DB_PATH y VERSION_FILE existen y tienen
     permisos de escritura. Los crea si faltan.
 
-    Lanza RuntimeError si alguna ruta no es accesible, lo que provoca que
-    uvicorn no arranque (fallo rápido intencional).
+    Lanza RuntimeError si alguna ruta no es accesible (fallo rápido intencional).
     """
     errors = []
 
@@ -142,51 +152,54 @@ except RuntimeError as e:
     print(f"[VAS-ERROR] FATAL: {e}", flush=True)
     raise
 
-# Inicializar base de datos (CREATE TABLE IF NOT EXISTS + fichero de versión)
+# Inicializar base de datos (CREATE TABLE IF NOT EXISTS + migración status + fichero de versión)
 database.init_db()
 
 
 # ---------------------------------------------------------------------------
-# Limpieza de clientes inactivos
+# Gestión del ciclo de vida de clientes
 # ---------------------------------------------------------------------------
 
-def cleanup_old_clients(days: int) -> int:
+def run_lifecycle() -> None:
     """
-    Elimina clientes cuyo last_seen sea anterior a (ahora - days días).
+    Ejecuta las tres transiciones del ciclo de vida de clientes al arrancar VAS.
 
-    Usa una única transacción SQLite para COUNT + DELETE, evitando
-    inconsistencias si el proceso se interrumpe entre ambas operaciones.
-
-    Devuelve el número de clientes eliminados.
+    1. active → inactive: clientes sin heartbeat desde TTL_INACTIVE_DAYS días.
+       Sube versión si hay cambios (los consumidores dejan de ver al equipo).
+    2. inactive → archived: clientes inactivos desde TTL_ARCHIVE_DAYS días.
+       No sube versión (ya estaban fuera del inventario activo).
+    3. archived → DELETE: eliminación definitiva tras TTL_PURGE_DAYS días.
+       TTL_PURGE_DAYS=0 desactiva el borrado (histórico permanente).
     """
-    cutoff     = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
+    ttl_inactive = int(config.get("TTL_INACTIVE_DAYS", 30))
+    ttl_archive  = int(config.get("TTL_ARCHIVE_DAYS",  90))
+    ttl_purge    = int(config.get("TTL_PURGE_DAYS",   365))
 
-    print(f"[VAS-CLEANUP] TTL: {days} día(s). Cutoff: {cutoff_str}", flush=True)
+    print(
+        f"[VAS-LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d",
+        flush=True,
+    )
 
-    conn = database.get_connection()
-    cur  = conn.cursor()
-
-    cur.execute("SELECT COUNT(*) FROM clients")
-    total_before = cur.fetchone()[0]
-    print(f"[VAS-CLEANUP] Clientes en BD antes de limpieza: {total_before}", flush=True)
-
-    cur.execute("DELETE FROM clients WHERE last_seen < ?", (cutoff,))
-    deleted = cur.rowcount
-    conn.commit()
-    conn.close()
-
-    total_after = total_before - deleted
-    if deleted > 0:
+    # Paso 1: marcar inactivos (puede cambiar el inventario activo → sube versión)
+    marked = database.mark_inactive_clients(ttl_inactive)
+    if marked > 0:
+        version = database.bump_version()
         print(
-            f"[VAS-CLEANUP] {deleted} cliente(s) purgado(s) por inactividad. "
-            f"Restantes: {total_after}",
+            f"[VAS-LIFECYCLE] {marked} cliente(s) → inactive. Versión publicada: {version}",
             flush=True,
         )
     else:
-        print(f"[VAS-CLEANUP] Sin clientes inactivos. Total: {total_after}", flush=True)
+        print("[VAS-LIFECYCLE] Sin clientes nuevos a inactivar.", flush=True)
 
-    return deleted
+    # Paso 2: archivar inactivos antiguos (no sube versión, ya no estaban en activos)
+    archived = database.archive_clients(ttl_archive)
+    if archived > 0:
+        print(f"[VAS-LIFECYCLE] {archived} cliente(s) → archived.", flush=True)
+
+    # Paso 3: purgar archivados muy antiguos (destructivo; 0 = desactivado)
+    purged = database.purge_clients(ttl_purge)
+    if purged > 0:
+        print(f"[VAS-LIFECYCLE] {purged} cliente(s) eliminado(s) definitivamente.", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -198,33 +211,17 @@ async def lifespan(app: FastAPI):
     """
     Contexto de vida de la aplicación FastAPI.
 
-    En startup:
-      1. Muestra la configuración efectiva.
-      2. Ejecuta la limpieza de clientes inactivos según CLIENT_TTL_DAYS.
-      3. Si se purgaron clientes, publica una nueva versión para que los
-         consumidores (veyon-sync) detecten el cambio.
-
-    Los errores de startup son capturados y logueados sin bloquear el arranque,
-    ya que la limpieza es una operación de mantenimiento no crítica.
+    En startup ejecuta run_lifecycle() para gestionar los estados de los clientes.
+    Los errores no bloquean el arranque (la limpieza es mantenimiento no crítico).
     """
     print(
         f"[VAS-STARTUP] VAS arrancando en puerto {config.get('PORT', '8000')} | "
-        f"DB: {config['DB_PATH']} | TTL: {config['CLIENT_TTL_DAYS']} días",
+        f"DB: {config['DB_PATH']}",
         flush=True,
     )
     try:
-        ttl_days = int(config.get("CLIENT_TTL_DAYS", 30))
-        deleted  = cleanup_old_clients(ttl_days)
-
-        if deleted > 0:
-            version = database.bump_version()
-            print(
-                f"[VAS-STARTUP] Versión publicada tras limpieza: {version}",
-                flush=True,
-            )
-
+        run_lifecycle()
         print("[VAS-STARTUP] Listo para recibir peticiones.", flush=True)
-
     except Exception as e:
         print(f"[VAS-ERROR] Fallo en startup (no fatal): {e}", flush=True)
 
@@ -257,13 +254,10 @@ def register(client: Client):
     """
     Registra o actualiza un cliente en el inventario.
 
-    Comportamiento:
-    - Siempre actualiza last_seen (mantiene el cliente vivo frente al TTL).
-    - Sube la versión SOLO si hostname, ip o mac han cambiado.
-    - Retorna {status, version} donde version es la versión actual del registro.
-
-    Esto permite a VAC usar este endpoint como heartbeat periódico sin
-    generar versiones innecesarias cuando los datos no cambian.
+    Siempre actualiza last_seen y restaura status a 'active' (reactiva
+    clientes inactivos o archivados automáticamente).
+    Sube versión solo si datos o status han cambiado.
+    Retorna {status, version}.
     """
     try:
         mac = client.mac or ""
@@ -300,8 +294,8 @@ def version():
     Devuelve la versión actual del registro.
 
     Los clientes (VAC, veyon-sync) comparan esta versión con la suya local
-    para decidir si deben descargar el inventario actualizado. La versión
-    tiene formato YYYYMMDDHHMMSS (timestamp UTC en el momento del último cambio).
+    para decidir si deben descargar el inventario actualizado.
+    Formato YYYYMMDDHHMMSS (timestamp UTC del último cambio).
     """
     ver = database.get_version()
     print(f"[VAS-VERSION] Consulta → {ver}", flush=True)
@@ -309,16 +303,29 @@ def version():
 
 
 @app.get("/clients")
-def list_clients():
+def list_clients(
+    status: str = Query(
+        default="active",
+        description="Filtro de estado: active (default) | inactive | archived | all",
+    )
+):
     """
-    Devuelve el inventario completo de clientes registrados.
+    Devuelve clientes filtrados por estado.
 
-    Cada entrada incluye: id, hostname, ip, mac, last_seen.
-    Ordenado alfabéticamente por hostname.
+    ?status=active   → solo activos (default; consumidores VAC/veyon-sync)
+    ?status=inactive → solo inactivos (sin heartbeat reciente)
+    ?status=archived → solo archivados (histórico)
+    ?status=all      → todos los estados
+
+    Cada entrada incluye: id, hostname, ip, mac, status, last_seen.
     """
+    valid = {"active", "inactive", "archived", "all"}
+    if status not in valid:
+        raise HTTPException(status_code=400, detail=f"status inválido. Valores: {sorted(valid)}")
+
     try:
-        clients = database.get_all_clients()
-        print(f"[VAS-CLIENTS] Listado servido: {len(clients)} cliente(s)", flush=True)
+        clients = database.get_all_clients(status=status)
+        print(f"[VAS-CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)", flush=True)
         return {"clients": clients}
     except Exception as e:
         print(f"[VAS-ERROR] Fallo en GET /clients: {e}", flush=True)
@@ -331,8 +338,7 @@ def get_client(client_id: str):
     Devuelve los datos de un cliente específico por UUID.
 
     Retorna 404 si el UUID no existe en el registro.
-    Útil para diagnóstico y para que servicios externos verifiquen
-    si un equipo concreto está registrado.
+    Incluye el campo status para diagnóstico del ciclo de vida.
     """
     print(f"[VAS-CLIENTS] Consulta individual: {client_id}", flush=True)
     client = database.get_client(client_id)
@@ -343,7 +349,7 @@ def get_client(client_id: str):
 
     print(
         f"[VAS-CLIENTS] Encontrado: {client_id} → "
-        f"{client['hostname']} / {client['ip']}",
+        f"{client['hostname']} / {client['ip']} [{client['status']}]",
         flush=True,
     )
     return client

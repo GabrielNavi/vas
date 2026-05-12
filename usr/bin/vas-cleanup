@@ -1,14 +1,29 @@
 #!/bin/bash
+# vas-cleanup — Gestión manual del ciclo de vida de clientes VAS
+#
+# Permite ejecutar las tres transiciones de estado de forma interactiva:
+#   1. Marcar inactivos  (active → inactive, no destructivo, sube versión)
+#   2. Archivar          (inactive → archived, no destructivo)
+#   3. Purgar            (archived → DELETE, destructivo e irreversible)
+#
+# Requiere permisos de escritura en la BD: ejecutar como root (sudo vas-cleanup).
+#
+# Journalctl: sudo journalctl -u vas -f  (para ver el efecto en VAS)
+
 set -euo pipefail
 
 CONFIG_FILE="/etc/vas/vas.conf"
 CONFIG_DIR="/etc/vas/vas.conf.d"
 
-TTL_DEFAULT=30
 DB_PATH="/var/lib/vas/vas.db"
 VERSION_FILE="/var/lib/vas/version"
+TTL_INACTIVE=30
+TTL_ARCHIVE=90
+TTL_PURGE=365
 
-# Parser seguro: no ejecuta código del fichero de configuración.
+# ---------------------------------------------------------------------------
+# Carga de configuración (parser seguro, sin source)
+# ---------------------------------------------------------------------------
 load_conf() {
     local file="$1"
     [ -f "$file" ] || return 0
@@ -19,9 +34,11 @@ load_conf() {
         [ -z "$key" ] && continue
 
         case "$key" in
-            CLIENT_TTL_DAYS) TTL_DEFAULT="$val" ;;
-            DB_PATH)         DB_PATH="$val"     ;;
-            VERSION_FILE)    VERSION_FILE="$val" ;;
+            DB_PATH)           DB_PATH="$val"      ;;
+            VERSION_FILE)      VERSION_FILE="$val"  ;;
+            TTL_INACTIVE_DAYS) TTL_INACTIVE="$val"  ;;
+            TTL_ARCHIVE_DAYS)  TTL_ARCHIVE="$val"   ;;
+            TTL_PURGE_DAYS)    TTL_PURGE="$val"     ;;
         esac
     done < <(grep -v '^\s*#' "$file" | grep '=' || true)
 }
@@ -35,17 +52,14 @@ if [ -d "$CONFIG_DIR" ]; then
     done
 fi
 
-# -----------------------------
-# Detectar interfaz (zenity → dialog → CLI)
-# -----------------------------
+# ---------------------------------------------------------------------------
+# Interfaz (zenity → dialog → CLI)
+# ---------------------------------------------------------------------------
 use_zenity=false
 use_dialog=false
 
-if command -v zenity >/dev/null 2>&1; then
-    use_zenity=true
-elif command -v dialog >/dev/null 2>&1; then
-    use_dialog=true
-fi
+command -v zenity >/dev/null 2>&1 && use_zenity=true
+$use_zenity || { command -v dialog >/dev/null 2>&1 && use_dialog=true; }
 
 ask_input() {
     local prompt="$1" default="$2"
@@ -76,81 +90,209 @@ show_info() {
     if $use_zenity; then
         zenity --info --title="VAS Cleanup" --text="$msg"
     elif $use_dialog; then
-        dialog --msgbox "$msg" 8 60
+        dialog --msgbox "$msg" 10 60
     else
         echo "$msg"
     fi
 }
 
-# -----------------------------
-# Pedir días y validar
-# -----------------------------
-DAYS=$(ask_input \
-    "Introduce el número de días para purgar clientes antiguos.\nValor por defecto: $TTL_DEFAULT días" \
-    "$TTL_DEFAULT")
+ask_menu() {
+    if $use_zenity; then
+        zenity --list --title="VAS Cleanup" \
+            --column="Opción" --column="Descripción" \
+            "1" "Marcar inactivos (active → inactive, sube versión)" \
+            "2" "Archivar inactivos (inactive → archived, histórico)" \
+            "3" "Purgar archivados (archived → DELETE, irreversible)" \
+            "4" "Ciclo completo (1+2+3 en secuencia)" \
+            || exit 1
+    elif $use_dialog; then
+        dialog --stdout --menu "VAS Cleanup — elige operación:" 15 70 4 \
+            "1" "Marcar inactivos (active → inactive)" \
+            "2" "Archivar inactivos (inactive → archived)" \
+            "3" "Purgar archivados (archived → DELETE)" \
+            "4" "Ciclo completo (1+2+3)" \
+            || exit 1
+    else
+        echo ""
+        echo "VAS Cleanup — ciclo de vida de clientes"
+        echo "  1) Marcar inactivos  (active → inactive, sube versión)"
+        echo "  2) Archivar          (inactive → archived, histórico)"
+        echo "  3) Purgar            (archived → DELETE, irreversible)"
+        echo "  4) Ciclo completo    (1+2+3 en secuencia)"
+        echo ""
+        read -rp "Elige [1-4]: " choice
+        echo "$choice"
+    fi
+}
 
-if ! [[ "$DAYS" =~ ^[0-9]+$ ]]; then
-    show_info "Valor inválido: $DAYS (debe ser un número entero)"
+# ---------------------------------------------------------------------------
+# Verificaciones previas
+# ---------------------------------------------------------------------------
+if [ ! -f "$DB_PATH" ]; then
+    show_info "Base de datos no encontrada: $DB_PATH\n¿Está VAS instalado y ha arrancado al menos una vez?"
     exit 1
 fi
 
-if (( DAYS < 1 || DAYS > 365 )); then
-    show_info "Valor fuera de rango: $DAYS (debe estar entre 1 y 365 días)"
+if [ ! -w "$DB_PATH" ]; then
+    show_info "Sin permisos de escritura en $DB_PATH.\nEjecuta como root:\n\n  sudo vas-cleanup"
     exit 1
 fi
 
-CUTOFF_DATE=$(date -u -d "$DAYS days ago" "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null \
-    || date -u -v-"${DAYS}"d "+%Y-%m-%d %H:%M:%S UTC" 2>/dev/null \
-    || echo "hace $DAYS días")
+# ---------------------------------------------------------------------------
+# Menú y selección de TTLs
+# ---------------------------------------------------------------------------
+CHOICE="$(ask_menu)"
 
-ask_confirm "¿Seguro que deseas eliminar clientes no vistos después de $CUTOFF_DATE?\nEsta acción es irreversible."
+if ! [[ "$CHOICE" =~ ^[1-4]$ ]]; then
+    show_info "Opción inválida: $CHOICE"
+    exit 1
+fi
 
-# -----------------------------
-# Ejecutar limpieza
-# Usamos <<'PYEOF' (comilla simple) para evitar interpolación de shell.
-# Las rutas se pasan como variables de entorno.
-# -----------------------------
-echo "[CLEANUP] Eliminando clientes no vistos en más de $DAYS días..." >&2
+# Pedir días para cada operación seleccionada
+DO_INACTIVE=false
+DO_ARCHIVE=false
+DO_PURGE=false
 
-CLEANUP_DAYS="$DAYS" \
+case "$CHOICE" in
+    1) DO_INACTIVE=true ;;
+    2) DO_ARCHIVE=true  ;;
+    3) DO_PURGE=true    ;;
+    4) DO_INACTIVE=true; DO_ARCHIVE=true; DO_PURGE=true ;;
+esac
+
+if $DO_INACTIVE; then
+    DAYS_INACTIVE="$(ask_input "Días sin heartbeat para marcar como INACTIVO:" "$TTL_INACTIVE")"
+    [[ "$DAYS_INACTIVE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_INACTIVE"; exit 1; }
+fi
+
+if $DO_ARCHIVE; then
+    DAYS_ARCHIVE="$(ask_input "Días sin heartbeat para ARCHIVAR (inactive → archived):" "$TTL_ARCHIVE")"
+    [[ "$DAYS_ARCHIVE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_ARCHIVE"; exit 1; }
+fi
+
+if $DO_PURGE; then
+    DAYS_PURGE="$(ask_input "Días sin heartbeat para BORRAR definitivamente (0 = desactivado):" "$TTL_PURGE")"
+    [[ "$DAYS_PURGE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_PURGE"; exit 1; }
+fi
+
+# Confirmación final
+SUMMARY=""
+$DO_INACTIVE && SUMMARY+="• Marcar inactivos: sin heartbeat desde hace ${DAYS_INACTIVE}d\n"
+$DO_ARCHIVE  && SUMMARY+="• Archivar: inactivos desde hace ${DAYS_ARCHIVE}d\n"
+$DO_PURGE    && SUMMARY+="• Purgar: archivados desde hace ${DAYS_PURGE}d (IRREVERSIBLE)\n"
+
+ask_confirm "Se ejecutarán las siguientes operaciones:\n\n${SUMMARY}\n¿Continuar?"
+
+# ---------------------------------------------------------------------------
+# Ejecutar operaciones en Python (sin importar módulos de VAS)
+# ---------------------------------------------------------------------------
+echo "[VAS-CLEANUP] Iniciando gestión de ciclo de vida..." >&2
+
+DO_INACTIVE_PY=$( $DO_INACTIVE && echo "True" || echo "False" )
+DO_ARCHIVE_PY=$(  $DO_ARCHIVE  && echo "True" || echo "False" )
+DO_PURGE_PY=$(    $DO_PURGE    && echo "True" || echo "False" )
+
+DAYS_INACTIVE="${DAYS_INACTIVE:-0}"
+DAYS_ARCHIVE="${DAYS_ARCHIVE:-0}"
+DAYS_PURGE="${DAYS_PURGE:-0}"
+
+DO_INACTIVE_ENV="$DO_INACTIVE_PY" \
+DO_ARCHIVE_ENV="$DO_ARCHIVE_PY" \
+DO_PURGE_ENV="$DO_PURGE_PY" \
+DAYS_INACTIVE_ENV="$DAYS_INACTIVE" \
+DAYS_ARCHIVE_ENV="$DAYS_ARCHIVE" \
+DAYS_PURGE_ENV="$DAYS_PURGE" \
 VAS_DB_PATH="$DB_PATH" \
 VAS_VERSION_FILE="$VERSION_FILE" \
 python3 <<'PYEOF'
-import os
-import datetime
-import sqlite3
+import os, datetime, sqlite3
+from datetime import timezone
 
-days         = int(os.environ["CLEANUP_DAYS"])
+def utcnow():
+    return datetime.datetime.now(timezone.utc).replace(tzinfo=None)
+
 db_path      = os.environ["VAS_DB_PATH"]
 version_file = os.environ["VAS_VERSION_FILE"]
-
-cutoff     = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
-
-print(f"[CLEANUP] Cutoff: {cutoff_str}", flush=True)
+do_inactive  = os.environ["DO_INACTIVE_ENV"] == "True"
+do_archive   = os.environ["DO_ARCHIVE_ENV"]  == "True"
+do_purge     = os.environ["DO_PURGE_ENV"]    == "True"
+days_i       = int(os.environ["DAYS_INACTIVE_ENV"])
+days_a       = int(os.environ["DAYS_ARCHIVE_ENV"])
+days_p       = int(os.environ["DAYS_PURGE_ENV"])
 
 conn = sqlite3.connect(db_path)
 cur  = conn.cursor()
 
-cur.execute("SELECT COUNT(*) FROM clients")
-total_before = cur.fetchone()[0]
+version_bumped = False
 
-cur.execute("DELETE FROM clients WHERE last_seen < ?", (cutoff,))
-deleted = cur.rowcount
-conn.commit()
-conn.close()
-
-total_after = total_before - deleted
-print(f"[CLEANUP] {deleted} cliente(s) eliminado(s), {total_after} restante(s).", flush=True)
-
-if deleted > 0:
-    version = datetime.datetime.utcnow().strftime("%Y%m%d%H%M%S")
+def bump_version():
+    global version_bumped
+    v = utcnow().strftime("%Y%m%d%H%M%S")
     tmp = version_file + ".tmp"
     with open(tmp, "w") as f:
-        f.write(version)
+        f.write(v)
     os.replace(tmp, version_file)
-    print(f"[CLEANUP] Versión actualizada a {version}.", flush=True)
-    print("[CLEANUP] veyon-sync detectará el cambio en su próximo ciclo.", flush=True)
+    version_bumped = True
+    return v
+
+# Paso 1: active → inactive
+if do_inactive:
+    cutoff = utcnow() - datetime.timedelta(days=days_i)
+    cur.execute(
+        "UPDATE clients SET status='inactive' WHERE status='active' AND last_seen < ?",
+        (cutoff,)
+    )
+    n = cur.rowcount
+    conn.commit()
+    if n > 0:
+        v = bump_version()
+        print(f"[VAS-CLEANUP] {n} cliente(s) → inactive. Versión publicada: {v}", flush=True)
+    else:
+        print(f"[VAS-CLEANUP] Ningún cliente activo supera {days_i} días de inactividad.", flush=True)
+
+# Paso 2: inactive → archived
+if do_archive:
+    cutoff = utcnow() - datetime.timedelta(days=days_a)
+    cur.execute(
+        "UPDATE clients SET status='archived' WHERE status='inactive' AND last_seen < ?",
+        (cutoff,)
+    )
+    n = cur.rowcount
+    conn.commit()
+    if n > 0:
+        print(f"[VAS-CLEANUP] {n} cliente(s) → archived.", flush=True)
+    else:
+        print(f"[VAS-CLEANUP] Ningún cliente inactivo supera {days_a} días.", flush=True)
+
+# Paso 3: archived → DELETE
+if do_purge:
+    if days_p == 0:
+        print("[VAS-CLEANUP] Purga desactivada (días=0).", flush=True)
+    else:
+        cutoff = utcnow() - datetime.timedelta(days=days_p)
+        cur.execute(
+            "DELETE FROM clients WHERE status='archived' AND last_seen < ?",
+            (cutoff,)
+        )
+        n = cur.rowcount
+        conn.commit()
+        if n > 0:
+            print(f"[VAS-CLEANUP] {n} cliente(s) eliminado(s) definitivamente.", flush=True)
+        else:
+            print(f"[VAS-CLEANUP] Ningún cliente archivado supera {days_p} días.", flush=True)
+
+conn.close()
+
+# Resumen final de la BD
+conn2 = sqlite3.connect(db_path)
+cur2  = conn2.cursor()
+cur2.execute("SELECT status, COUNT(*) FROM clients GROUP BY status")
+rows = cur2.fetchall()
+conn2.close()
+summary = ", ".join(f"{s}: {c}" for s, c in rows) or "BD vacía"
+print(f"[VAS-CLEANUP] Estado BD: {summary}", flush=True)
+if version_bumped:
+    print("[VAS-CLEANUP] veyon-sync detectará el cambio en su próximo ciclo.", flush=True)
 PYEOF
 
-show_info "Limpieza completada.\nLos clientes activos se re-registrarán automáticamente.\nSi tienes vx-dga-l-veyon-sync instalado, actualizará Veyon en el próximo ciclo."
+show_info "Operación completada.\nConsulta journalctl -u vas -f para ver el efecto en VAS.\nLos clientes activos se re-registrarán automáticamente."

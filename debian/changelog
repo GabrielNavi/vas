@@ -1,3 +1,24 @@
+vx-dga-l-vas (0.7-1) unstable; urgency=medium
+
+  * Ciclo de vida de clientes: active → inactive → archived → (purge).
+    Sustituye el borrado inmediato por transiciones de estado con histórico.
+  * database.py: nuevas funciones mark_inactive_clients(), archive_clients(),
+    purge_clients(). get_all_clients() filtra por status (default: active).
+    Migración automática: ALTER TABLE añade columna status si no existe.
+    add_or_update_client() restaura status='active' en cada heartbeat.
+    client_has_changed() detecta reactivación (inactive/archived → active).
+    Reemplazado utcnow() deprecado por now(timezone.utc).replace(tzinfo=None).
+    Corregido bug: get_all_clients() incluye id en SELECT y usa índices correctos.
+  * vas.py: run_lifecycle() reemplaza cleanup_old_clients(). GET /clients acepta
+    ?status= (active|inactive|archived|all). Configuración efectiva muestra
+    los tres TTLs. Módulo docstring actualizado con ciclo de vida.
+  * vas.conf: CLIENT_TTL_DAYS sustituido por TTL_INACTIVE_DAYS=30,
+    TTL_ARCHIVE_DAYS=90, TTL_PURGE_DAYS=365 (0=nunca borrar).
+  * vas-cleanup: reescrito con menú de tres operaciones independientes
+    (marcar, archivar, purgar) más opción de ciclo completo.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 13:00:00 +0200
+
 vx-dga-l-vas (0.6-5) unstable; urgency=medium
 
   * Simplificado wrapper /usr/bin/vas: sustituido el parser manual de
