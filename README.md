@@ -88,7 +88,7 @@ Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
 
 ## Seguridad
 
-- El servicio corre como usuario dedicado `_vas` (sin shell, sin home).
+- El servicio corre como usuario dedicado `vas` (sin shell, sin home).
 - El parser de configuración no ejecuta código: usa `split("=", 1)` + strip de comillas.
 
 ## Servicio systemd

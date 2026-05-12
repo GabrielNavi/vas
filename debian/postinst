@@ -4,8 +4,8 @@ set -e
 echo "[VAS] Ejecutando postinst..."
 
 # Crear usuario de sistema si no existe
-if ! getent passwd _vas > /dev/null 2>&1; then
-    adduser --system --no-create-home --group _vas
+if ! getent passwd vas > /dev/null 2>&1; then
+    adduser --system --no-create-home --group vas
 fi
 
 # Crear directorios persistentes con permisos correctos
@@ -13,13 +13,13 @@ mkdir -p /var/lib/vas
 mkdir -p /var/log/vas
 mkdir -p /etc/vas/vas.conf.d
 
-chown -R _vas:_vas /var/lib/vas
-chown -R _vas:_vas /var/log/vas
+chown -R vas:vas /var/lib/vas
+chown -R vas:vas /var/log/vas
 
 # Crear archivo de versión si no existe
 if [ ! -f /var/lib/vas/version ]; then
     echo "0" > /var/lib/vas/version
-    chown _vas:_vas /var/lib/vas/version
+    chown vas:vas /var/lib/vas/version
 fi
 
 # Recargar systemd

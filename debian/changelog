@@ -1,3 +1,11 @@
+vx-dga-l-vas (0.6-4) unstable; urgency=medium
+
+  * Renombrado usuario de sistema _vas → vas: el guión bajo inicial viola
+    NAME_REGEX_SYSTEM en Debian y causaba fallo de postinst con adduser.
+    Actualizado postinst, vas.service y README.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 10:30:00 +0200
+
 vx-dga-l-vas (0.6-3) unstable; urgency=low
 
   * Añadidos docstrings y logging extensivo en vas.py y database.py
