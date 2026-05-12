@@ -1,3 +1,12 @@
+vx-dga-l-vas (0.6-5) unstable; urgency=medium
+
+  * Simplificado wrapper /usr/bin/vas: sustituido el parser manual de
+    configuración por source (. "$CONF_FILE"). El fichero solo es
+    escribible por root; la complejidad del parser causaba errores de
+    sintaxis difíciles de diagnosticar. Shebang fijado a #!/bin/bash.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 11:00:00 +0200
+
 vx-dga-l-vas (0.6-4) unstable; urgency=medium
 
   * Renombrado usuario de sistema _vas → vas: el guión bajo inicial viola
