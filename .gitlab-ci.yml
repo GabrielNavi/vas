@@ -6,3 +6,21 @@ stages:
   - build
   - upload
   - deployment
+build-vitalinux3x:
+  image: vitalinux3x:dev
+  stage: build
+  script:
+    - useradd -m $_USER
+    - mkdir -p $_PATH
+    - cp -a * $_PATH
+    - chmod +x $_PATH/debian/rules
+    - pushd $_PATH
+    - su -c "/usr/bin/debuild --no-tgz-check -us -uc" $_USER
+    - popd
+    - mv /home/$_USER/*.deb .
+  artifacts:
+    expire_in: 1 days
+    paths:
+    - ./*.deb
+  only:
+    - tags
