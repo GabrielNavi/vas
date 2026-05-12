@@ -1,3 +1,11 @@
+vx-dga-l-vas (0.7-2) unstable; urgency=medium
+
+  * GET /clients elimina el UUID de la respuesta (mínima exposición de datos).
+    El UUID no es información pública en el listado general; solo lo devuelve
+    GET /clients/{id}, que ya lo requiere como parámetro.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 14:00:00 +0200
+
 vx-dga-l-vas (0.7-1) unstable; urgency=medium
 
   * Ciclo de vida de clientes: active → inactive → archived → (purge).

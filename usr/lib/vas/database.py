@@ -165,25 +165,26 @@ def get_all_clients(status: str = "active") -> list:
 
     if status == "all":
         cur.execute(
-            "SELECT id, hostname, ip, mac, status, last_seen FROM clients ORDER BY hostname"
+            "SELECT hostname, ip, mac, status, last_seen FROM clients ORDER BY hostname"
         )
     else:
         cur.execute(
-            "SELECT id, hostname, ip, mac, status, last_seen FROM clients WHERE status=? ORDER BY hostname",
+            "SELECT hostname, ip, mac, status, last_seen FROM clients WHERE status=? ORDER BY hostname",
             (status,),
         )
 
     rows = cur.fetchall()
     conn.close()
 
+    # El UUID no se incluye en el listado público: principio de mínima exposición.
+    # Solo GET /clients/{id} lo devuelve, y quien lo consulta ya lo conoce.
     return [
         {
-            "id":        r[0],
-            "hostname":  r[1],
-            "ip":        r[2],
-            "mac":       r[3],
-            "status":    r[4],
-            "last_seen": r[5],
+            "hostname":  r[0],
+            "ip":        r[1],
+            "mac":       r[2],
+            "status":    r[3],
+            "last_seen": r[4],
         }
         for r in rows
     ]
