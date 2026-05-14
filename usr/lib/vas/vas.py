@@ -7,6 +7,7 @@ Expone una API REST consumible por cualquier servicio (VAC, veyon-sync, etc.).
 
 Endpoints:
   POST /register            → registra o actualiza un cliente; retorna versión actual
+  POST /heartbeat           → actualiza last_seen sin tocar datos ni versión
   GET  /version             → versión del registro (YYYYMMDDHHMMSS)
   GET  /clients             → clientes activos (default) o filtrados por ?status=
   GET  /clients/{id}        → cliente individual por UUID
@@ -18,7 +19,6 @@ Ciclo de vida de clientes (gestionado en startup y por vas-cleanup):
   (purge)  → eliminación definitiva tras TTL_PURGE_DAYS (0 = nunca)
 """
 import os
-import datetime
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -26,6 +26,7 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 import database
+from vas_log import log, log_debug, setup_logging
 
 CONFIG_FILE = "/etc/vas/vas.conf"
 CONFIG_DIR  = "/etc/vas/vas.conf.d"
@@ -53,53 +54,46 @@ def load_config() -> dict:
         "TTL_INACTIVE_DAYS":  "30",
         "TTL_ARCHIVE_DAYS":   "90",
         "TTL_PURGE_DAYS":     "365",
+        "LOG_LEVEL":          "normal",
+        "LOG_FILE":           "",
     }
 
     def _apply_file(path: str) -> None:
-        """Lee un fichero de configuración y aplica sus valores sobre cfg."""
         if not os.path.isfile(path):
             return
-        loaded = []
         with open(path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line or line.startswith("#") or "=" not in line:
                     continue
                 k, v = line.split("=", 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                cfg[k] = v
-                loaded.append(k)
-        print(f"[VAS-CONFIG] {path}: cargadas {len(loaded)} clave(s): {', '.join(loaded)}", flush=True)
+                cfg[k.strip()] = v.strip().strip('"').strip("'")
 
     _apply_file(CONFIG_FILE)
 
     if os.path.isdir(CONFIG_DIR):
-        overlays = sorted(f for f in os.listdir(CONFIG_DIR) if f.endswith(".conf"))
-        if overlays:
-            print(f"[VAS-CONFIG] Overlays encontrados en {CONFIG_DIR}: {overlays}", flush=True)
-        for name in overlays:
+        for name in sorted(f for f in os.listdir(CONFIG_DIR) if f.endswith(".conf")):
             _apply_file(os.path.join(CONFIG_DIR, name))
-    else:
-        print(f"[VAS-CONFIG] Sin directorio de overlays ({CONFIG_DIR})", flush=True)
 
     return cfg
 
 
-# Cargar configuración e inyectar rutas en el módulo database
+# Cargar configuración e inicializar logging antes de cualquier otra operación.
 config = load_config()
+setup_logging(config["LOG_LEVEL"], config["LOG_FILE"])
 
-database.DB_PATH      = config["DB_PATH"]
-database.VERSION_FILE = config["VERSION_FILE"]
-
-print(
+log_debug(
     f"[VAS-CONFIG] Configuración efectiva: "
     f"PORT={config['PORT']} DB={config['DB_PATH']} "
     f"TTL_INACTIVE={config['TTL_INACTIVE_DAYS']}d "
     f"TTL_ARCHIVE={config['TTL_ARCHIVE_DAYS']}d "
-    f"TTL_PURGE={config['TTL_PURGE_DAYS']}d",
-    flush=True,
+    f"TTL_PURGE={config['TTL_PURGE_DAYS']}d "
+    f"LOG_LEVEL={config['LOG_LEVEL']}"
 )
+
+# Inyectar rutas en el módulo database
+database.DB_PATH      = config["DB_PATH"]
+database.VERSION_FILE = config["VERSION_FILE"]
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +118,7 @@ def validate_paths() -> None:
         if not os.path.exists(dir_path):
             try:
                 os.makedirs(dir_path, exist_ok=True)
-                print(f"[VAS-PATHS] Directorio creado: {dir_path}", flush=True)
+                log(f"[VAS-PATHS] Directorio creado: {dir_path}")
             except OSError as e:
                 errors.append(f"{var_name}: no se puede crear {dir_path}: {e}")
                 continue
@@ -137,11 +131,11 @@ def validate_paths() -> None:
             errors.append(f"{var_name}: sin permisos de escritura en {path}")
             continue
 
-        print(f"[VAS-PATHS] OK: {path}", flush=True)
+        log_debug(f"[VAS-PATHS] OK: {path}")
 
     if errors:
         for err in errors:
-            print(f"[VAS-ERROR] {err}", flush=True)
+            log(f"[VAS-ERROR] {err}")
         raise RuntimeError(f"Configuración inválida: {len(errors)} problema(s) de permisos")
 
 
@@ -149,7 +143,7 @@ def validate_paths() -> None:
 try:
     validate_paths()
 except RuntimeError as e:
-    print(f"[VAS-ERROR] FATAL: {e}", flush=True)
+    log(f"[VAS-ERROR] FATAL: {e}")
     raise
 
 # Inicializar base de datos (CREATE TABLE IF NOT EXISTS + migración status + fichero de versión)
@@ -175,31 +169,24 @@ def run_lifecycle() -> None:
     ttl_archive  = int(config.get("TTL_ARCHIVE_DAYS",  90))
     ttl_purge    = int(config.get("TTL_PURGE_DAYS",   365))
 
-    print(
-        f"[VAS-LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d",
-        flush=True,
+    log_debug(
+        f"[VAS-LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d"
     )
 
-    # Paso 1: marcar inactivos (puede cambiar el inventario activo → sube versión)
     marked = database.mark_inactive_clients(ttl_inactive)
     if marked > 0:
         version = database.bump_version()
-        print(
-            f"[VAS-LIFECYCLE] {marked} cliente(s) → inactive. Versión publicada: {version}",
-            flush=True,
-        )
+        log(f"[VAS-LIFECYCLE] {marked} cliente(s) → inactive. Versión publicada: {version}")
     else:
-        print("[VAS-LIFECYCLE] Sin clientes nuevos a inactivar.", flush=True)
+        log_debug("[VAS-LIFECYCLE] Sin clientes nuevos a inactivar.")
 
-    # Paso 2: archivar inactivos antiguos (no sube versión, ya no estaban en activos)
     archived = database.archive_clients(ttl_archive)
     if archived > 0:
-        print(f"[VAS-LIFECYCLE] {archived} cliente(s) → archived.", flush=True)
+        log(f"[VAS-LIFECYCLE] {archived} cliente(s) → archived.")
 
-    # Paso 3: purgar archivados muy antiguos (destructivo; 0 = desactivado)
     purged = database.purge_clients(ttl_purge)
     if purged > 0:
-        print(f"[VAS-LIFECYCLE] {purged} cliente(s) eliminado(s) definitivamente.", flush=True)
+        log(f"[VAS-LIFECYCLE] {purged} cliente(s) eliminado(s) definitivamente.")
 
 
 # ---------------------------------------------------------------------------
@@ -214,20 +201,19 @@ async def lifespan(app: FastAPI):
     En startup ejecuta run_lifecycle() para gestionar los estados de los clientes.
     Los errores no bloquean el arranque (la limpieza es mantenimiento no crítico).
     """
-    print(
+    log(
         f"[VAS-STARTUP] VAS arrancando en puerto {config.get('PORT', '8000')} | "
-        f"DB: {config['DB_PATH']}",
-        flush=True,
+        f"DB: {config['DB_PATH']}"
     )
     try:
         run_lifecycle()
-        print("[VAS-STARTUP] Listo para recibir peticiones.", flush=True)
+        log("[VAS-STARTUP] Listo para recibir peticiones.")
     except Exception as e:
-        print(f"[VAS-ERROR] Fallo en startup (no fatal): {e}", flush=True)
+        log(f"[VAS-ERROR] Fallo en startup (no fatal): {e}")
 
     yield  # La aplicación sirve peticiones a partir de aquí
 
-    print("[VAS-SHUTDOWN] Cerrando VAS.", flush=True)
+    log("[VAS-SHUTDOWN] Cerrando VAS.")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -251,6 +237,11 @@ class Client(BaseModel):
     mac:               Optional[str]  = None
     extra_imperative:  Optional[dict] = None
     extra_informative: Optional[dict] = None
+
+
+class HeartbeatRequest(BaseModel):
+    """Cuerpo de POST /heartbeat: solo el UUID del cliente."""
+    id: str
 
 
 # ---------------------------------------------------------------------------
@@ -282,24 +273,46 @@ def register(client: Client):
 
         if changed:
             version = database.bump_version()
-            print(
+            log(
                 f"[VAS-REGISTER] NUEVO/CAMBIO → {client.id} "
                 f"host={client.hostname} ip={client.ip} mac={mac or '(vacía)'} "
-                f"versión={version}",
-                flush=True,
+                f"versión={version}"
             )
         else:
             version = database.get_version()
-            print(
+            log_debug(
                 f"[VAS-REGISTER] HEARTBEAT → {client.id} ({client.hostname}) "
-                f"sin cambios. last_seen actualizado. versión={version}",
-                flush=True,
+                f"sin cambios. last_seen actualizado. versión={version}"
             )
 
         return {"status": "ok", "version": version}
 
     except Exception as e:
-        print(f"[VAS-ERROR] Fallo en POST /register [{client.id}]: {e}", flush=True)
+        log(f"[VAS-ERROR] Fallo en POST /register [{client.id}]: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/heartbeat")
+def heartbeat(hb: HeartbeatRequest):
+    """
+    Heartbeat ligero: actualiza last_seen y restaura status='active'.
+
+    No toca datos del cliente (hostname, ip, mac, extras).
+    Si el cliente estaba inactive o archived, sube versión para que los
+    consumidores (VAC, veyon-sync) detecten la reactivación en el inventario.
+    Retorna 404 si el UUID es desconocido — señal para que VAC se re-registre.
+    Retorna {status, version}.
+    """
+    try:
+        database.touch_client(hb.id)
+        version = database.get_version()
+        log_debug(f"[VAS-HEARTBEAT] OK → {hb.id} versión={version}")
+        return {"status": "ok", "version": version}
+    except ValueError:
+        log(f"[VAS-HEARTBEAT] No encontrado: {hb.id}")
+        raise HTTPException(status_code=404, detail="Client not found")
+    except Exception as e:
+        log(f"[VAS-ERROR] Fallo en POST /heartbeat [{hb.id}]: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -313,7 +326,7 @@ def version():
     Formato YYYYMMDDHHMMSS (timestamp UTC del último cambio).
     """
     ver = database.get_version()
-    print(f"[VAS-VERSION] Consulta → {ver}", flush=True)
+    log_debug(f"[VAS-VERSION] Consulta → {ver}")
     return {"version": ver}
 
 
@@ -340,10 +353,10 @@ def list_clients(
 
     try:
         clients = database.get_all_clients(status=status)
-        print(f"[VAS-CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)", flush=True)
+        log_debug(f"[VAS-CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)")
         return {"clients": clients}
     except Exception as e:
-        print(f"[VAS-ERROR] Fallo en GET /clients: {e}", flush=True)
+        log(f"[VAS-ERROR] Fallo en GET /clients: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -355,16 +368,15 @@ def get_client(client_id: str):
     Retorna 404 si el UUID no existe en el registro.
     Incluye el campo status para diagnóstico del ciclo de vida.
     """
-    print(f"[VAS-CLIENTS] Consulta individual: {client_id}", flush=True)
+    log_debug(f"[VAS-CLIENTS] Consulta individual: {client_id}")
     client = database.get_client(client_id)
 
     if client is None:
-        print(f"[VAS-CLIENTS] No encontrado: {client_id}", flush=True)
+        log(f"[VAS-CLIENTS] No encontrado: {client_id}")
         raise HTTPException(status_code=404, detail="Client not found")
 
-    print(
+    log_debug(
         f"[VAS-CLIENTS] Encontrado: {client_id} → "
-        f"{client['hostname']} / {client['ip']} [{client['status']}]",
-        flush=True,
+        f"{client['hostname']} / {client['ip']} [{client['status']}]"
     )
     return client

@@ -21,6 +21,8 @@ import os
 import datetime
 from datetime import timezone
 
+from vas_log import log, log_debug
+
 
 def _utcnow() -> datetime.datetime:
     """Devuelve la hora UTC actual como datetime naive (compatible con CURRENT_TIMESTAMP de SQLite)."""
@@ -72,11 +74,11 @@ def init_db():
     ]:
         if col not in cols:
             cur.execute(f"ALTER TABLE clients ADD COLUMN {col} {definition}")
-            print(f"[VAS-DB] Migración: columna '{col}' añadida.", flush=True)
+            log(f"[VAS-DB] Migración: columna '{col}' añadida.")
 
     conn.commit()
     conn.close()
-    print(f"[VAS-DB] Base de datos lista: {DB_PATH}", flush=True)
+    log_debug(f"[VAS-DB] Base de datos lista: {DB_PATH}")
 
     # Inicializar fichero de versión
     version_dir = os.path.dirname(VERSION_FILE)
@@ -86,22 +88,28 @@ def init_db():
     if not os.path.exists(VERSION_FILE):
         with open(VERSION_FILE, "w") as f:
             f.write("0")
-        print(f"[VAS-DB] Fichero de versión inicializado: {VERSION_FILE} → 0", flush=True)
+        log(f"[VAS-DB] Fichero de versión inicializado: {VERSION_FILE} → 0")
     else:
         current = get_version()
-        print(f"[VAS-DB] Versión actual al arrancar: {current}", flush=True)
+        log(f"[VAS-DB] Versión actual al arrancar: {current}")
 
+
+_EXTRA_CLEAR = "__clear__"  # Sentinel: borrado explícito del campo en VAS.
 
 def _serialize_extra(extra: dict | None) -> str | None:
     """
-    Serializa un dict de extra a JSON compacto con claves ordenadas.
+    Serializa un dict de extra con semántica de tres estados:
 
-    Orden determinista para que la comparación de string funcione correctamente
-    aunque el emisor varíe el orden de las claves entre ciclos.
-    Devuelve None si extra es None o vacío.
+      None  → None       — sin opinión; VAS conserva el valor existente (COALESCE).
+      {}    → _EXTRA_CLEAR — borrado explícito; VAS pone el campo a NULL.
+      {...} → JSON string  — actualización; VAS sobreescribe el campo.
+
+    Orden de claves determinista para comparación estable entre ciclos.
     """
-    if not extra:
+    if extra is None:
         return None
+    if extra == {}:
+        return _EXTRA_CLEAR
     return json.dumps(extra, sort_keys=True, separators=(",", ":"))
 
 
@@ -133,7 +141,7 @@ def client_has_changed(
     conn.close()
 
     if row is None:
-        print(f"[VAS-DB] Cliente nuevo: {client_id}", flush=True)
+        log(f"[VAS-DB] Cliente nuevo: {client_id}")
         return True
 
     old_hostname, old_ip, old_mac, old_status, old_extra_imp = row
@@ -149,11 +157,15 @@ def client_has_changed(
         changes.append(f"status: '{old_status}' → 'active' (reactivación)")
 
     new_extra_imp = _serialize_extra(extra_imperative)
-    if new_extra_imp != old_extra_imp:
-        changes.append("extra_imperative cambió")
+    # None = sin opinión (script no configurado o fallo transitorio): no reportar cambio.
+    # _EXTRA_CLEAR = borrado explícito: reportar solo si había valor previo.
+    if new_extra_imp is not None:
+        effective = None if new_extra_imp == _EXTRA_CLEAR else new_extra_imp
+        if effective != old_extra_imp:
+            changes.append("extra_imperative cambió")
 
     if changes:
-        print(f"[VAS-DB] Cambios en {client_id}: {', '.join(changes)}", flush=True)
+        log(f"[VAS-DB] Cambios en {client_id}: {', '.join(changes)}")
         return True
 
     return False
@@ -172,12 +184,24 @@ def add_or_update_client(
 
     Siempre actualiza last_seen y restaura status a 'active'.
     Esto reactiva automáticamente clientes que estaban inactivos o archivados.
+
+    Semántica de extras (implementada via CASE SQL):
+      None        → COALESCE: el campo en BD no se toca (script fallido o delegate).
+      __clear__   → NULL en BD: el campo se borra (EXTRAS_ENABLED=false en VAC).
+      JSON string → sobreescribe el campo con el nuevo valor.
+
     extra_imperative y extra_informative se almacenan como JSON compacto con
     claves ordenadas para que la comparación de string en client_has_changed
-    sea determinista.
+    sea determinista entre ciclos aunque el emisor varíe el orden de claves.
+
+    El SELECT previo al INSERT es necesario para distinguir "insertado" de
+    "actualizado" en el log, ya que lastrowid no es fiable con ON CONFLICT.
     """
     conn = get_connection()
     cur  = conn.cursor()
+
+    cur.execute("SELECT 1 FROM clients WHERE id = ?", (client_id,))
+    is_new = cur.fetchone() is None
 
     ei  = _serialize_extra(extra_imperative)
     einf = _serialize_extra(extra_informative)
@@ -190,15 +214,57 @@ def add_or_update_client(
             ip                = excluded.ip,
             mac               = excluded.mac,
             status            = 'active',
-            extra_imperative  = excluded.extra_imperative,
-            extra_informative = excluded.extra_informative,
+            extra_imperative  = CASE
+                WHEN excluded.extra_imperative  = '__clear__' THEN NULL        -- borrado explícito ({} en Python)
+                WHEN excluded.extra_imperative  IS NULL       THEN clients.extra_imperative  -- COALESCE: conservar valor
+                ELSE excluded.extra_imperative  END,
+            extra_informative = CASE
+                WHEN excluded.extra_informative = '__clear__' THEN NULL
+                WHEN excluded.extra_informative IS NULL       THEN clients.extra_informative
+                ELSE excluded.extra_informative END,
             last_seen         = CURRENT_TIMESTAMP
     """, (client_id, hostname, ip, mac, ei, einf))
 
-    action = "insertado" if cur.lastrowid and cur.rowcount == 1 else "actualizado"
+    action = "insertado" if is_new else "actualizado"
     conn.commit()
     conn.close()
-    print(f"[VAS-DB] Cliente {action}: {client_id} ({hostname}, {ip})", flush=True)
+    log_debug(f"[VAS-DB] Cliente {action}: {client_id} ({hostname}, {ip})")
+
+
+def touch_client(client_id: str) -> None:
+    """
+    Actualiza last_seen y restaura status='active' de un cliente conocido.
+
+    No toca ningún campo de datos (hostname, ip, mac, extras).
+    Si el cliente estaba inactive o archived, la reactivación sube versión
+    para que los consumidores detecten el cambio de inventario.
+    Lanza ValueError si el UUID no existe (VAC debe re-registrarse).
+    """
+    conn = get_connection()
+    cur  = conn.cursor()
+
+    cur.execute("SELECT status FROM clients WHERE id = ?", (client_id,))
+    row = cur.fetchone()
+    if row is None:
+        conn.close()
+        raise ValueError(f"Cliente no registrado: {client_id}")
+
+    old_status = row[0]
+
+    cur.execute(
+        "UPDATE clients SET last_seen = CURRENT_TIMESTAMP, status = 'active' WHERE id = ?",
+        (client_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    if old_status != "active":
+        version = bump_version()
+        log(
+            f"[VAS-DB] Heartbeat (reactivación {old_status}→active): {client_id} versión={version}"
+        )
+    else:
+        log_debug(f"[VAS-DB] Heartbeat: {client_id}")
 
 
 def get_all_clients(status: str = "active") -> list:
@@ -311,7 +377,7 @@ def mark_inactive_clients(days: int) -> int:
     conn.close()
 
     if marked > 0:
-        print(f"[VAS-DB] {marked} cliente(s) marcado(s) como inactive (TTL: {days}d).", flush=True)
+        log(f"[VAS-DB] {marked} cliente(s) marcado(s) como inactive (TTL: {days}d).")
 
     return marked
 
@@ -338,7 +404,7 @@ def archive_clients(days: int) -> int:
     conn.close()
 
     if archived > 0:
-        print(f"[VAS-DB] {archived} cliente(s) archivado(s) (TTL: {days}d).", flush=True)
+        log(f"[VAS-DB] {archived} cliente(s) archivado(s) (TTL: {days}d).")
 
     return archived
 
@@ -351,7 +417,7 @@ def purge_clients(days: int) -> int:
     Devuelve el número de clientes eliminados.
     """
     if days == 0:
-        print("[VAS-DB] TTL_PURGE_DAYS=0: borrado permanente desactivado.", flush=True)
+        log_debug("[VAS-DB] TTL_PURGE_DAYS=0: borrado permanente desactivado.")
         return 0
 
     cutoff = _utcnow() - datetime.timedelta(days=days)
@@ -368,7 +434,7 @@ def purge_clients(days: int) -> int:
     conn.close()
 
     if purged > 0:
-        print(f"[VAS-DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {days}d).", flush=True)
+        log(f"[VAS-DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {days}d).")
 
     return purged
 
@@ -384,10 +450,10 @@ def get_version() -> str:
         with open(VERSION_FILE) as f:
             return f.read().strip()
     except FileNotFoundError:
-        print(f"[VAS-DB] Aviso: fichero de versión no encontrado ({VERSION_FILE}). Usando 0.", flush=True)
+        log(f"[VAS-DB] Aviso: fichero de versión no encontrado ({VERSION_FILE}). Usando 0.")
         return "0"
     except IOError as e:
-        print(f"[VAS-DB] Error leyendo versión ({VERSION_FILE}): {e}. Usando 0.", flush=True)
+        log(f"[VAS-DB] Error leyendo versión ({VERSION_FILE}): {e}. Usando 0.")
         return "0"
 
 
@@ -404,7 +470,7 @@ def bump_version() -> str:
         with open(tmp, "w") as f:
             f.write(version)
         os.replace(tmp, VERSION_FILE)
-        print(f"[VAS-DB] Versión actualizada: {version}", flush=True)
+        log(f"[VAS-DB] Versión actualizada: {version}")
     except IOError as e:
-        print(f"[VAS-DB] Error escribiendo versión ({VERSION_FILE}): {e}", flush=True)
+        log(f"[VAS-DB] Error escribiendo versión ({VERSION_FILE}): {e}")
     return version
