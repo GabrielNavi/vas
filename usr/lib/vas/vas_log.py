@@ -7,8 +7,12 @@ Uso:
 
     setup_logging(level="normal", log_file="")
 
-    log("[VAS] mensaje normal")       # visible con LOG_LEVEL=normal o debug
-    log_debug("[VAS] detalle")        # solo visible con LOG_LEVEL=debug
+    log("[SCOPE] mensaje normal")       # visible con LOG_LEVEL=normal o debug
+    log_debug("[SCOPE] detalle")        # solo visible con LOG_LEVEL=debug
+
+Formato de salida:
+    log("[SCOPE] msg")       → [VAS] [SCOPE] msg
+    log_debug("[SCOPE] msg") → [VAS] [DEBUG] [SCOPE] msg
 
 LOG_LEVEL:
     no     → silencio total (ni stdout ni fichero)
@@ -41,16 +45,16 @@ def log(msg: str) -> None:
     """Mensaje de nivel normal: visible con LOG_LEVEL=normal o debug."""
     if _level == "no":
         return
-    _write(msg)
+    _write(f"[VAS] {msg}")
 
 
 def log_debug(msg: str) -> None:
     """Mensaje de nivel debug: solo visible con LOG_LEVEL=debug.
-    Prefijo [DEBUG] para filtrar con: journalctl -u vas | grep '[DEBUG]'
+    Filtrar con: journalctl -u vas | grep '\[DEBUG\]'
     """
     if _level != "debug":
         return
-    _write(f"[DEBUG] {msg}")
+    _write(f"[VAS] [DEBUG] {msg}")
 
 
 def setup_logging(level: str = "normal", log_file: str = "") -> None:

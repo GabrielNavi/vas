@@ -1,3 +1,23 @@
+vx-dga-l-vas (0.9-3~rc) unstable; urgency=low
+
+  * Normalizado el formato de salida de log para alinearlo con la filosofía
+    de VAC (vx-dga-l-vac):
+    - log()       emite [VAS] [SCOPE] msg        (antes: [VAS-SCOPE] msg)
+    - log_debug() emite [VAS] [DEBUG] [SCOPE] msg (antes: [DEBUG] [VAS-SCOPE] msg)
+    El prefijo [VAS] lo añade vas_log.py automáticamente, igual que $LOG_TAG
+    en vac-common.sh. Permite filtrar todo el tráfico de VAS con grep '\[VAS\]'
+    en contextos donde VAC y VAS comparten el mismo destino de log.
+  * vas.py, database.py: scopes simplificados (prefijo VAS- eliminado de los
+    mensajes; ya no es necesario porque la función lo antepone):
+    [VAS-CONFIG] → [CONFIG]    [VAS-PATHS]    → [PATHS]
+    [VAS-ERROR]  → [ERROR]     [VAS-LIFECYCLE] → [LIFECYCLE]
+    [VAS-STARTUP] → [STARTUP]  [VAS-SHUTDOWN]  → [SHUTDOWN]
+    [VAS-REGISTER] → [REGISTER] [VAS-HEARTBEAT] → [HEARTBEAT]
+    [VAS-VERSION] → [VERSION]   [VAS-CLIENTS]   → [CLIENTS]
+    [VAS-DB] → [DB]
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 14 May 2026 12:00:00 +0200
+
 vx-dga-l-vas (0.9-2~rc) unstable; urgency=low
 
   * Logging configurable via LOG_LEVEL (no|normal|debug) y LOG_FILE opcional.

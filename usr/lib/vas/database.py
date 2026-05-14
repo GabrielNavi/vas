@@ -74,11 +74,11 @@ def init_db():
     ]:
         if col not in cols:
             cur.execute(f"ALTER TABLE clients ADD COLUMN {col} {definition}")
-            log(f"[VAS-DB] Migración: columna '{col}' añadida.")
+            log(f"[DB] Migración: columna '{col}' añadida.")
 
     conn.commit()
     conn.close()
-    log_debug(f"[VAS-DB] Base de datos lista: {DB_PATH}")
+    log_debug(f"[DB] Base de datos lista: {DB_PATH}")
 
     # Inicializar fichero de versión
     version_dir = os.path.dirname(VERSION_FILE)
@@ -88,10 +88,10 @@ def init_db():
     if not os.path.exists(VERSION_FILE):
         with open(VERSION_FILE, "w") as f:
             f.write("0")
-        log(f"[VAS-DB] Fichero de versión inicializado: {VERSION_FILE} → 0")
+        log(f"[DB] Fichero de versión inicializado: {VERSION_FILE} → 0")
     else:
         current = get_version()
-        log(f"[VAS-DB] Versión actual al arrancar: {current}")
+        log(f"[DB] Versión actual al arrancar: {current}")
 
 
 _EXTRA_CLEAR = "__clear__"  # Sentinel: borrado explícito del campo en VAS.
@@ -141,7 +141,7 @@ def client_has_changed(
     conn.close()
 
     if row is None:
-        log(f"[VAS-DB] Cliente nuevo: {client_id}")
+        log(f"[DB] Cliente nuevo: {client_id}")
         return True
 
     old_hostname, old_ip, old_mac, old_status, old_extra_imp = row
@@ -165,7 +165,7 @@ def client_has_changed(
             changes.append("extra_imperative cambió")
 
     if changes:
-        log(f"[VAS-DB] Cambios en {client_id}: {', '.join(changes)}")
+        log(f"[DB] Cambios en {client_id}: {', '.join(changes)}")
         return True
 
     return False
@@ -228,7 +228,7 @@ def add_or_update_client(
     action = "insertado" if is_new else "actualizado"
     conn.commit()
     conn.close()
-    log_debug(f"[VAS-DB] Cliente {action}: {client_id} ({hostname}, {ip})")
+    log_debug(f"[DB] Cliente {action}: {client_id} ({hostname}, {ip})")
 
 
 def touch_client(client_id: str) -> None:
@@ -261,10 +261,10 @@ def touch_client(client_id: str) -> None:
     if old_status != "active":
         version = bump_version()
         log(
-            f"[VAS-DB] Heartbeat (reactivación {old_status}→active): {client_id} versión={version}"
+            f"[DB] Heartbeat (reactivación {old_status}→active): {client_id} versión={version}"
         )
     else:
-        log_debug(f"[VAS-DB] Heartbeat: {client_id}")
+        log_debug(f"[DB] Heartbeat: {client_id}")
 
 
 def get_all_clients(status: str = "active") -> list:
@@ -377,7 +377,7 @@ def mark_inactive_clients(days: int) -> int:
     conn.close()
 
     if marked > 0:
-        log(f"[VAS-DB] {marked} cliente(s) marcado(s) como inactive (TTL: {days}d).")
+        log(f"[DB] {marked} cliente(s) marcado(s) como inactive (TTL: {days}d).")
 
     return marked
 
@@ -404,7 +404,7 @@ def archive_clients(days: int) -> int:
     conn.close()
 
     if archived > 0:
-        log(f"[VAS-DB] {archived} cliente(s) archivado(s) (TTL: {days}d).")
+        log(f"[DB] {archived} cliente(s) archivado(s) (TTL: {days}d).")
 
     return archived
 
@@ -417,7 +417,7 @@ def purge_clients(days: int) -> int:
     Devuelve el número de clientes eliminados.
     """
     if days == 0:
-        log_debug("[VAS-DB] TTL_PURGE_DAYS=0: borrado permanente desactivado.")
+        log_debug("[DB] TTL_PURGE_DAYS=0: borrado permanente desactivado.")
         return 0
 
     cutoff = _utcnow() - datetime.timedelta(days=days)
@@ -434,7 +434,7 @@ def purge_clients(days: int) -> int:
     conn.close()
 
     if purged > 0:
-        log(f"[VAS-DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {days}d).")
+        log(f"[DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {days}d).")
 
     return purged
 
@@ -450,10 +450,10 @@ def get_version() -> str:
         with open(VERSION_FILE) as f:
             return f.read().strip()
     except FileNotFoundError:
-        log(f"[VAS-DB] Aviso: fichero de versión no encontrado ({VERSION_FILE}). Usando 0.")
+        log(f"[DB] Aviso: fichero de versión no encontrado ({VERSION_FILE}). Usando 0.")
         return "0"
     except IOError as e:
-        log(f"[VAS-DB] Error leyendo versión ({VERSION_FILE}): {e}. Usando 0.")
+        log(f"[DB] Error leyendo versión ({VERSION_FILE}): {e}. Usando 0.")
         return "0"
 
 
@@ -470,7 +470,7 @@ def bump_version() -> str:
         with open(tmp, "w") as f:
             f.write(version)
         os.replace(tmp, VERSION_FILE)
-        log(f"[VAS-DB] Versión actualizada: {version}")
+        log(f"[DB] Versión actualizada: {version}")
     except IOError as e:
-        log(f"[VAS-DB] Error escribiendo versión ({VERSION_FILE}): {e}")
+        log(f"[DB] Error escribiendo versión ({VERSION_FILE}): {e}")
     return version

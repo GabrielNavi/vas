@@ -24,10 +24,10 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 0.9-1
+- Versión: 0.9-3~rc
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
-- Licencia: GPL-3.0+
+- Licencia: Apache 2.0
 
 ## Archivos instalados
 
@@ -119,6 +119,19 @@ Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
 - El servicio corre como usuario dedicado `vas` (sin shell, sin home).
 - El parser de configuración no ejecuta código: usa `split("=", 1)` + strip de comillas.
 - `GET /clients` no incluye el UUID en el listado público; solo `GET /clients/{id}` lo devuelve (quien lo consulta ya lo conoce).
+
+## Logging
+
+Formato de salida: `[VAS] [SCOPE] mensaje` (normal) · `[VAS] [DEBUG] [SCOPE] mensaje` (debug).
+
+```bash
+journalctl -u vas -f                        # tiempo real
+journalctl -u vas | grep '\[DEBUG\]'        # solo debug
+journalctl -u vas | grep '\[ERROR\]'        # solo errores
+journalctl -u vas | grep '\[LIFECYCLE\]'    # transiciones de ciclo de vida
+```
+
+El prefijo `[VAS]` lo añade `vas_log.py` automáticamente. Ver la wiki ([Logging](../../vx-dga-l-vas.wiki/-/blob/main/Logging.md)) para la referencia completa de scopes.
 
 ## Servicio systemd
 

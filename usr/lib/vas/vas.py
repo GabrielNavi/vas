@@ -83,7 +83,7 @@ config = load_config()
 setup_logging(config["LOG_LEVEL"], config["LOG_FILE"])
 
 log_debug(
-    f"[VAS-CONFIG] Configuración efectiva: "
+    f"[CONFIG] Configuración efectiva: "
     f"PORT={config['PORT']} DB={config['DB_PATH']} "
     f"TTL_INACTIVE={config['TTL_INACTIVE_DAYS']}d "
     f"TTL_ARCHIVE={config['TTL_ARCHIVE_DAYS']}d "
@@ -118,7 +118,7 @@ def validate_paths() -> None:
         if not os.path.exists(dir_path):
             try:
                 os.makedirs(dir_path, exist_ok=True)
-                log(f"[VAS-PATHS] Directorio creado: {dir_path}")
+                log(f"[PATHS] Directorio creado: {dir_path}")
             except OSError as e:
                 errors.append(f"{var_name}: no se puede crear {dir_path}: {e}")
                 continue
@@ -131,11 +131,11 @@ def validate_paths() -> None:
             errors.append(f"{var_name}: sin permisos de escritura en {path}")
             continue
 
-        log_debug(f"[VAS-PATHS] OK: {path}")
+        log_debug(f"[PATHS] OK: {path}")
 
     if errors:
         for err in errors:
-            log(f"[VAS-ERROR] {err}")
+            log(f"[ERROR] {err}")
         raise RuntimeError(f"Configuración inválida: {len(errors)} problema(s) de permisos")
 
 
@@ -143,7 +143,7 @@ def validate_paths() -> None:
 try:
     validate_paths()
 except RuntimeError as e:
-    log(f"[VAS-ERROR] FATAL: {e}")
+    log(f"[ERROR] FATAL: {e}")
     raise
 
 # Inicializar base de datos (CREATE TABLE IF NOT EXISTS + migración status + fichero de versión)
@@ -170,23 +170,23 @@ def run_lifecycle() -> None:
     ttl_purge    = int(config.get("TTL_PURGE_DAYS",   365))
 
     log_debug(
-        f"[VAS-LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d"
+        f"[LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d"
     )
 
     marked = database.mark_inactive_clients(ttl_inactive)
     if marked > 0:
         version = database.bump_version()
-        log(f"[VAS-LIFECYCLE] {marked} cliente(s) → inactive. Versión publicada: {version}")
+        log(f"[LIFECYCLE] {marked} cliente(s) → inactive. Versión publicada: {version}")
     else:
-        log_debug("[VAS-LIFECYCLE] Sin clientes nuevos a inactivar.")
+        log_debug("[LIFECYCLE] Sin clientes nuevos a inactivar.")
 
     archived = database.archive_clients(ttl_archive)
     if archived > 0:
-        log(f"[VAS-LIFECYCLE] {archived} cliente(s) → archived.")
+        log(f"[LIFECYCLE] {archived} cliente(s) → archived.")
 
     purged = database.purge_clients(ttl_purge)
     if purged > 0:
-        log(f"[VAS-LIFECYCLE] {purged} cliente(s) eliminado(s) definitivamente.")
+        log(f"[LIFECYCLE] {purged} cliente(s) eliminado(s) definitivamente.")
 
 
 # ---------------------------------------------------------------------------
@@ -202,18 +202,18 @@ async def lifespan(app: FastAPI):
     Los errores no bloquean el arranque (la limpieza es mantenimiento no crítico).
     """
     log(
-        f"[VAS-STARTUP] VAS arrancando en puerto {config.get('PORT', '8000')} | "
+        f"[STARTUP] VAS arrancando en puerto {config.get('PORT', '8000')} | "
         f"DB: {config['DB_PATH']}"
     )
     try:
         run_lifecycle()
-        log("[VAS-STARTUP] Listo para recibir peticiones.")
+        log("[STARTUP] Listo para recibir peticiones.")
     except Exception as e:
-        log(f"[VAS-ERROR] Fallo en startup (no fatal): {e}")
+        log(f"[ERROR] Fallo en startup (no fatal): {e}")
 
     yield  # La aplicación sirve peticiones a partir de aquí
 
-    log("[VAS-SHUTDOWN] Cerrando VAS.")
+    log("[SHUTDOWN] Cerrando VAS.")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -274,21 +274,21 @@ def register(client: Client):
         if changed:
             version = database.bump_version()
             log(
-                f"[VAS-REGISTER] NUEVO/CAMBIO → {client.id} "
+                f"[REGISTER] NUEVO/CAMBIO → {client.id} "
                 f"host={client.hostname} ip={client.ip} mac={mac or '(vacía)'} "
                 f"versión={version}"
             )
         else:
             version = database.get_version()
             log_debug(
-                f"[VAS-REGISTER] HEARTBEAT → {client.id} ({client.hostname}) "
+                f"[REGISTER] HEARTBEAT → {client.id} ({client.hostname}) "
                 f"sin cambios. last_seen actualizado. versión={version}"
             )
 
         return {"status": "ok", "version": version}
 
     except Exception as e:
-        log(f"[VAS-ERROR] Fallo en POST /register [{client.id}]: {e}")
+        log(f"[ERROR] Fallo en POST /register [{client.id}]: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -306,13 +306,13 @@ def heartbeat(hb: HeartbeatRequest):
     try:
         database.touch_client(hb.id)
         version = database.get_version()
-        log_debug(f"[VAS-HEARTBEAT] OK → {hb.id} versión={version}")
+        log_debug(f"[HEARTBEAT] OK → {hb.id} versión={version}")
         return {"status": "ok", "version": version}
     except ValueError:
-        log(f"[VAS-HEARTBEAT] No encontrado: {hb.id}")
+        log(f"[HEARTBEAT] No encontrado: {hb.id}")
         raise HTTPException(status_code=404, detail="Client not found")
     except Exception as e:
-        log(f"[VAS-ERROR] Fallo en POST /heartbeat [{hb.id}]: {e}")
+        log(f"[ERROR] Fallo en POST /heartbeat [{hb.id}]: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -326,7 +326,7 @@ def version():
     Formato YYYYMMDDHHMMSS (timestamp UTC del último cambio).
     """
     ver = database.get_version()
-    log_debug(f"[VAS-VERSION] Consulta → {ver}")
+    log_debug(f"[VERSION] Consulta → {ver}")
     return {"version": ver}
 
 
@@ -353,10 +353,10 @@ def list_clients(
 
     try:
         clients = database.get_all_clients(status=status)
-        log_debug(f"[VAS-CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)")
+        log_debug(f"[CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)")
         return {"clients": clients}
     except Exception as e:
-        log(f"[VAS-ERROR] Fallo en GET /clients: {e}")
+        log(f"[ERROR] Fallo en GET /clients: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -368,15 +368,15 @@ def get_client(client_id: str):
     Retorna 404 si el UUID no existe en el registro.
     Incluye el campo status para diagnóstico del ciclo de vida.
     """
-    log_debug(f"[VAS-CLIENTS] Consulta individual: {client_id}")
+    log_debug(f"[CLIENTS] Consulta individual: {client_id}")
     client = database.get_client(client_id)
 
     if client is None:
-        log(f"[VAS-CLIENTS] No encontrado: {client_id}")
+        log(f"[CLIENTS] No encontrado: {client_id}")
         raise HTTPException(status_code=404, detail="Client not found")
 
     log_debug(
-        f"[VAS-CLIENTS] Encontrado: {client_id} → "
+        f"[CLIENTS] Encontrado: {client_id} → "
         f"{client['hostname']} / {client['ip']} [{client['status']}]"
     )
     return client
