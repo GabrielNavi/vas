@@ -1,3 +1,38 @@
+vx-dga-l-vas (0.9-2~rc) unstable; urgency=low
+
+  * Logging configurable via LOG_LEVEL (no|normal|debug) y LOG_FILE opcional.
+    - usr/lib/vas/vas_log.py: nuevo módulo compartido con log() y log_debug()
+      (patrón idéntico a vac-common.sh). log_debug() añade prefijo [DEBUG].
+    - vas.py y database.py: migrados de print() a log()/log_debug().
+      Mensajes rutinarios (heartbeat OK, consultas GET, versión) → log_debug().
+      Eventos importantes (registros, cambios, errores, lifecycle) → log().
+    - LOG_FILE: si está definido, escribe también en fichero con timestamp
+      ISO-8601 UTC (el directorio /var/log/vas lo crea el postinst).
+    - vas.conf: LOG_LEVEL=normal activo; LOG_FILE comentado con ejemplo.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 10:00:00 +0200
+
+vx-dga-l-vas (0.9-1) unstable; urgency=medium
+
+  * Nuevo endpoint POST /heartbeat: actualiza last_seen y restaura status='active'
+    sin tocar datos del cliente ni subir versión. Devuelve 404 si el UUID es
+    desconocido (señal para que VAC se re-registre automáticamente).
+  * database.py: nueva función touch_client() para heartbeat ligero.
+    Si el cliente estaba inactive/archived, la reactivación sube versión
+    para que los consumidores (veyon-sync, VAC) detecten el cambio.
+  * database.py: semántica de tres estados en extras (imperative e informative):
+    - null       → COALESCE: conserva valor existente (script no configurado o fallo).
+    - {}         → borrado explícito: pone el campo a NULL en BD.
+    - {...}      → actualización normal.
+    Implementado via CASE SQL en add_or_update_client(); client_has_changed()
+    ignora null y trata {} como borrado solo si había valor previo.
+  * database.py: add_or_update_client() usa SELECT previo para distinguir
+    "insertado" de "actualizado" en el log (lastrowid no es fiable con upsert).
+  * debian/install: añadido usr/bin/vas-cleanup (faltaba desde 0.7-1).
+  * Requiere vx-dga-l-vac >= 0.9-1 para el nuevo protocolo de heartbeat.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 13 May 2026 18:00:00 +0200
+
 vx-dga-l-vas (0.8-1) unstable; urgency=medium
 
   * Campos extra extensibles en POST /register:
@@ -103,22 +138,22 @@ vx-dga-l-vas (0.6-1) unstable; urgency=medium
 
 vx-dga-l-vas (0.5-1) unstable; urgency=medium
 
-  * Mayor Overhaul de logging para depuración de errores
-  
+  * Revisión mayor del sistema de logging para depuración de errores.
+
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 4 May 2026 10:30:00 +0200
 
 vx-dga-l-vas (0.4-4) unstable; urgency=medium
 
-  * Arreglo de errores de limpeza y localidad de ejecución de los scripts
-  
+  * Corregidos errores de limpieza y localidad de ejecución de los scripts.
+
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
 
 vx-dga-l-vas (0.4-3) unstable; urgency=medium
 
-  * Añadido soporte de subconfiguracion en /etc/vas/vas.conf.d/*.conf
+  * Añadido soporte de subconfiguración en /etc/vas/vas.conf.d/*.conf
     para permitir overlays sin modificar vas.conf base.
-  * El wrapper y la aplicacion Python cargan configuracion en cascada.
-  * postinst asegura la creacion de /etc/vas/vas.conf.d.
+  * El wrapper y la aplicación Python cargan configuración en cascada.
+  * postinst asegura la creación de /etc/vas/vas.conf.d.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
 
@@ -126,18 +161,18 @@ vx-dga-l-vas (0.4-2) unstable; urgency=medium
 
   * Corregida la ruta de registro para que fallos puntuales al sincronizar
     networkobjects con Veyon Master no bloqueen POST /register.
-  * Endurecida la sanitizacion de VEYON_LOCATION al generar CSV de importacion.
+  * Endurecida la sanitización de VEYON_LOCATION al generar CSV de importación.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 12:35:00 +0200
 
 vx-dga-l-vas (0.4-1) unstable; urgency=medium
 
-  * Añadida sincronizacion automatica de networkobjects en Veyon Master.
+  * Añadida sincronización automática de networkobjects en Veyon Master.
   * VAS ahora genera CSV e importa objetos con formato
     %type%;%name%;%host%;%mac%;%location% mediante veyon-cli.
-  * La sincronizacion se limita a una location configurable y no bloquea
-    el arranque del servicio si Veyon no esta disponible.
-  * Nuevas opciones de configuracion: VEYON_MASTER_SYNC, VEYON_LOCATION
+  * La sincronización se limita a una location configurable y no bloquea
+    el arranque del servicio si Veyon no está disponible.
+  * Nuevas opciones de configuración: VEYON_MASTER_SYNC, VEYON_LOCATION
     y VEYON_CSV_PATH.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 11:15:00 +0200
@@ -164,13 +199,13 @@ vx-dga-l-vas (0.3-1) unstable; urgency=medium
 
 vx-dga-l-vas (0.2-6) unstable; urgency=medium
 
-  * Movimiento de raiz del arbol del paquete.
+  * Movimiento de la raíz del árbol del paquete.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:30:00 +0200
 
 vx-dga-l-vas (0.2-5) unstable; urgency=medium
 
-  * Modificacion de base de datos.
+  * Modificación de la base de datos.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:20:00 +0200
 
@@ -182,37 +217,37 @@ vx-dga-l-vas (0.2-4) unstable; urgency=medium
 
 vx-dga-l-vas (0.2-3) unstable; urgency=medium
 
-  * Diseno inicial de vas.py.
+  * Diseño inicial de vas.py.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:00:00 +0200
 
 vx-dga-l-vas (0.2-2) unstable; urgency=medium
 
-  * Cambios en scripts de instalacion Debian.
+  * Cambios en scripts de instalación Debian.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:50:00 +0200
 
 vx-dga-l-vas (0.2-1) unstable; urgency=medium
 
-  * Creado control y normalizacion de configuracion y wrapper de VAS.
+  * Creado control y normalización de configuración y wrapper de VAS.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:40:00 +0200
 
 vx-dga-l-vas (0.2-0) unstable; urgency=medium
 
-  * packaging: remove pip from runtime dependencies.
-  * packaging: add python3-venv to Build-Depends for builder venv setup.
-  * postinst: make systemd calls resilient (daemon-reload/enable with fallback).
-  * postinst: auto-start service on fresh install.
-  * postinst: restart service on upgrade.
-  * config policy: keep Veyon output focused on computers.json.gitl
+  * Eliminado pip de las dependencias en tiempo de ejecución.
+  * Añadido python3-venv a Build-Depends para la configuración del entorno de compilación.
+  * postinst: llamadas a systemd resilientes (daemon-reload/enable con fallback).
+  * postinst: arranque automático del servicio en instalación nueva.
+  * postinst: reinicio del servicio en actualización.
+  * Política de configuración: salida Veyon centrada en computers.json.
 
- -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +02:00
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +0200
 
 vx-dga-l-vas (0.1-0) unstable; urgency=medium
 
-  * Initial commit.
-  * Debian package skeleton for VAS.
-  * Added systemd service, launcher, default config and maintainer scripts.
+  * Commit inicial.
+  * Esqueleto de paquete Debian para VAS.
+  * Añadidos servicio systemd, lanzador, configuración por defecto y scripts de mantenimiento.
 
- -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +02:00
+ -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +0200

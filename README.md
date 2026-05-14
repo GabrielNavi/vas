@@ -24,7 +24,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 0.6-2
+- Versión: 0.9-1
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: GPL-3.0+
@@ -35,6 +35,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 |---|---|
 | `usr/lib/vas/vas.py` | Aplicación FastAPI principal |
 | `usr/lib/vas/database.py` | Capa de persistencia SQLite |
+| `usr/lib/vas/vas_log.py` | Funciones de logging compartidas (log, log_debug) |
 | `usr/bin/vas` | Wrapper de arranque (extrae PORT, lanza uvicorn) |
 | `usr/bin/vas-cleanup` | Herramienta interactiva de limpieza manual |
 | `etc/vas/vas.conf` | Configuración editable |
@@ -45,32 +46,55 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 | Método | Endpoint | Descripción |
 |---|---|---|
 | `POST` | `/register` | Registra o actualiza un cliente. Retorna `{status, version}`. |
+| `POST` | `/heartbeat` | Actualiza `last_seen`. Sube versión si el cliente era `inactive`/`archived` (reactivación). 404 si UUID desconocido. |
 | `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSS`). |
-| `GET` | `/clients` | Lista completa: `{clients: [{id, hostname, ip, mac, last_seen}]}` |
+| `GET` | `/clients` | Clientes filtrados por `?status=` (default: `active`). |
 | `GET` | `/clients/{id}` | Cliente individual por UUID. 404 si no existe. |
 
-La versión solo se incrementa cuando cambian datos reales de algún cliente. Los heartbeats periódicos de VAC actualizan `last_seen` sin modificar la versión.
+La versión solo se incrementa cuando cambian datos reales de algún cliente o cuando un cliente pasa a `inactive`. Los heartbeats periódicos actualizan `last_seen` sin modificar la versión.
+
+### Semántica de campos extra
+
+`POST /register` acepta `extra_imperative` y `extra_informative` (objetos JSON opcionales):
+
+| Valor recibido | Efecto en BD |
+|---|---|
+| `{"k":"v"}` | Sobreescribe el campo |
+| `null` (omitido) | COALESCE: conserva el valor existente |
+| `{}` | Borra el campo (NULL en BD) |
+
+Solo `extra_imperative` dispara `bump_version`. `extra_informative` es puramente informativo.
+
+## Ciclo de vida de clientes
+
+```
+active   → registrándose normalmente (last_seen reciente)
+inactive → sin heartbeat desde TTL_INACTIVE_DAYS días  → sube versión
+archived → sin heartbeat desde TTL_ARCHIVE_DAYS días   → solo histórico
+(purge)  → eliminación definitiva tras TTL_PURGE_DAYS  → TTL_PURGE_DAYS=0: nunca
+```
+
+Las transiciones se ejecutan en cada arranque de VAS y pueden forzarse con `vas-cleanup`.
+
+Un cliente `inactive` o `archived` vuelve a `active` automáticamente al hacer `POST /register` o `POST /heartbeat`. Ambos endpoints suben versión al reactivar, para que los consumidores detecten el cambio.
 
 ## Flujo de arranque
 
 ```
 load_config()         → /etc/vas/vas.conf + /etc/vas/vas.conf.d/*.conf
 validate_paths()      → crea /var/lib/vas si falta; FATAL si sin permisos
-database.init_db()    → CREATE TABLE IF NOT EXISTS clients
+database.init_db()    → CREATE TABLE IF NOT EXISTS clients (+ migraciones)
 lifespan (startup):
-  cleanup_old_clients(CLIENT_TTL_DAYS)
-    → DELETE WHERE last_seen < (ahora - TTL)
-    → si eliminados > 0: bump_version()
+  run_lifecycle()
+    → active  → inactive  (TTL_INACTIVE_DAYS; bump_version si hay cambios)
+    → inactive → archived (TTL_ARCHIVE_DAYS)
+    → archived → DELETE   (TTL_PURGE_DAYS; 0 = desactivado)
 [endpoints activos]
 ```
 
-## Limpieza automática (TTL)
-
-VAS elimina clientes inactivos en cada arranque según `CLIENT_TTL_DAYS`. Un cliente activo que ejecute VAC cada `CHECK_SECONDS` nunca será purgado (relación de seguridad: `CHECK_SECONDS << CLIENT_TTL_DAYS × 86400`).
-
 ## Limpieza manual (`vas-cleanup`)
 
-Herramienta interactiva con interfaz Zenity, dialog o terminal. Pide confirmación, elimina clientes más antiguos que N días y actualiza la versión. `vx-dga-l-veyon-sync` detectará el cambio en su siguiente ciclo.
+Herramienta interactiva con interfaz Zenity, dialog o terminal. Permite ejecutar cada paso del ciclo de vida de forma independiente o como ciclo completo, con confirmación antes de cada operación destructiva.
 
 ## Configuración
 
@@ -82,14 +106,19 @@ Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
 | `PORT` | `8000` | Puerto HTTP de escucha |
 | `DB_PATH` | `/var/lib/vas/vas.db` | Base de datos SQLite |
 | `VERSION_FILE` | `/var/lib/vas/version` | Fichero de versión |
-| `CLIENT_TTL_DAYS` | `30` | Días de inactividad antes de purgar un cliente |
+| `TTL_INACTIVE_DAYS` | `30` | Días sin heartbeat para pasar a `inactive` |
+| `TTL_ARCHIVE_DAYS` | `90` | Días sin heartbeat para pasar a `archived` |
+| `TTL_PURGE_DAYS` | `365` | Días en `archived` antes de eliminar (0 = nunca) |
+| `LOG_LEVEL` | `normal` | Nivel de log: `no` (silencio), `normal` (eventos importantes), `debug` (detallado) |
+| `LOG_FILE` | — | Fichero de log adicional con timestamp ISO-8601 UTC (vacío = solo journald) |
 
-> `CLIENT_TTL_DAYS` debe ser notablemente mayor que `CHECK_SECONDS` de los clientes VAC. Con `CHECK_SECONDS=300`, cualquier valor superior a 1 día es seguro.
+> Los TTLs deben ser notablemente mayores que `CHECK_SECONDS` de los clientes VAC. Con `CHECK_SECONDS=300` y `TTL_INACTIVE_DAYS=30`, el margen es de más de 8000× .
 
 ## Seguridad
 
 - El servicio corre como usuario dedicado `vas` (sin shell, sin home).
 - El parser de configuración no ejecuta código: usa `split("=", 1)` + strip de comillas.
+- `GET /clients` no incluye el UUID en el listado público; solo `GET /clients/{id}` lo devuelve (quien lo consulta ya lo conoce).
 
 ## Servicio systemd
 

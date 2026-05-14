@@ -1,4 +1,5 @@
 usr/lib/vas/* usr/lib/vas/
 usr/bin/vas usr/bin/
+usr/bin/vas-cleanup usr/bin/
 etc/vas/vas.conf etc/vas/
 lib/systemd/system/vas.service lib/systemd/system/
