@@ -6,9 +6,9 @@ echo "[VAS] Ejecutando postrm..."
 # Si se ejecuta con "purge", eliminar datos persistentes
 if [ "$1" = "purge" ]; then
     echo "[VAS] Eliminando datos persistentes..."
+    rm -rf /etc/vas
     rm -rf /var/lib/vas
     rm -rf /var/log/vas
-    rm -f /var/log/vas.log
 fi
 
 exit 0

@@ -24,7 +24,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 0.9-3~rc
+- Versión: 0.9-5~rc
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: Apache 2.0
@@ -40,6 +40,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 | `usr/bin/vas-cleanup` | Herramienta interactiva de limpieza manual |
 | `etc/vas/vas.conf` | Configuración editable |
 | `lib/systemd/system/vas.service` | Unidad systemd |
+| `usr/share/vas/vas.conf.defaults` | Referencia de valores por defecto (solo lectura) |
 
 ## API
 

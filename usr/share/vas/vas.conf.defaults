@@ -1,0 +1,42 @@
+# Fichero de referencia — no edites este fichero.
+# Configuración activa:    /etc/vas/vas.conf
+# Sobreescrituras:         /etc/vas/vas.conf.d/*.conf
+
+# Configuración del servidor VAS
+# Puedes añadir sobreescrituras en /etc/vas/vas.conf.d/*.conf
+# (se aplican en orden lexical, después de este archivo).
+
+# Puerto en el que escucha el servidor FastAPI/Uvicorn
+PORT=8000
+
+# Ruta a la base de datos SQLite
+DB_PATH=/var/lib/vas/vas.db
+
+# ---------------------------------------------------------------------------
+# Ciclo de vida de clientes
+#
+# active → inactive → archived → (DELETE)
+#
+# Los consumidores normales (VAC, veyon-sync) solo ven clientes 'active'.
+# Un cliente inactivo vuelve a 'active' automáticamente al hacer heartbeat.
+# TTL_INACTIVE_DAYS debe ser notablemente mayor que CHECK_SECONDS de VAC.
+# Con CHECK_SECONDS=300 (5 min), cualquier valor > 1 día es seguro.
+# ---------------------------------------------------------------------------
+
+# Días sin heartbeat para marcar un cliente como 'inactive'
+# (sube versión → los consumidores dejan de verlo)
+TTL_INACTIVE_DAYS=30
+
+# Días sin heartbeat para archivar un cliente 'inactive' (histórico)
+TTL_ARCHIVE_DAYS=90
+
+# Días sin heartbeat para borrar definitivamente un cliente 'archived'
+# 0 = nunca borrar (conservar histórico permanente)
+TTL_PURGE_DAYS=365
+
+# Nivel de logging: no (silencio total), normal (eventos importantes), debug (detallado).
+# Filtrar mensajes debug en journalctl: journalctl -u vas | grep '\[DEBUG\]'
+LOG_LEVEL=normal
+
+# Fichero de log adicional con timestamp ISO-8601 UTC (vacío = solo stdout/journald).
+# LOG_FILE=/var/log/vas/vas.log

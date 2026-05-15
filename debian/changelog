@@ -1,3 +1,14 @@
+vx-dga-l-vas (0.9-5~rc) unstable; urgency=low
+
+  * Añadido /usr/share/vas/vas.conf.defaults: copia de referencia de la
+    configuración por defecto, siempre actualizada en upgrade.
+    Permite comparar con la configuración activa:
+    diff /etc/vas/vas.conf /usr/share/vas/vas.conf.defaults
+  * postrm: purge limpia ahora /etc/vas junto con /var/lib/vas y /var/log/vas
+    (antes no eliminaba /etc/vas en purge).
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Fri, 15 May 2026 12:00:00 +0200
+
 vx-dga-l-vas (0.9-4~rc) unstable; urgency=low
 
   * database.py: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos)
