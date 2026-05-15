@@ -24,3 +24,21 @@ build-vitalinux3x:
     - ./*.deb
   only:
     - tags
+upload-vitalinux3x:
+  image: vitalinux3x:dev
+  stage: upload
+  script:
+    - MIGASFREE_PACKAGER_PROJECT=VX-3.x migasfree-upload -f *.deb
+  dependencies:
+    - build-vitalinux3x
+  only:
+    - tags
+continous-deploy3x:
+  image: vitalinux3x:dev
+  stage: deployment
+  script:
+    - /usr/bin/migasfree-cd -s "$MIGASFREE_CLIENT_SERVER" -p "VX-3.x" -d "$_DEPLOY" *.deb
+  dependencies:
+    - build-vitalinux3x
+  only:
+    - tags
