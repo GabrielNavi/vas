@@ -1,3 +1,13 @@
+vx-dga-l-vas (0.9-4~rc) unstable; urgency=low
+
+  * database.py: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos)
+    en lugar de YYYYMMDDHHMMSS (14 dígitos), añadiendo milisegundos UTC.
+    Reduce el edge case de colisión cuando dos cambios ocurren en el mismo
+    segundo. Los consumidores (veyon-sync, vcd) usan ^[0-9]+$ y son
+    compatibles con cualquier longitud numérica sin cambios.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 17:00:00 +0200
+
 vx-dga-l-vas (0.9-3~rc) unstable; urgency=low
 
   * Normalizado el formato de salida de log para alinearlo con la filosofía

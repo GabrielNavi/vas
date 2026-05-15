@@ -47,7 +47,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 |---|---|---|
 | `POST` | `/register` | Registra o actualiza un cliente. Retorna `{status, version}`. |
 | `POST` | `/heartbeat` | Actualiza `last_seen`. Sube versión si el cliente era `inactive`/`archived` (reactivación). 404 si UUID desconocido. |
-| `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSS`). |
+| `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSSmmm`). |
 | `GET` | `/clients` | Clientes filtrados por `?status=` (default: `active`). |
 | `GET` | `/clients/{id}` | Cliente individual por UUID. 404 si no existe. |
 

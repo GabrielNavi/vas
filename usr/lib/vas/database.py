@@ -444,7 +444,7 @@ def get_version() -> str:
     Lee la versión actual desde VERSION_FILE.
 
     Devuelve "0" si el fichero no existe o su contenido es inválido.
-    La versión tiene formato YYYYMMDDHHMMSS (timestamp UTC).
+    La versión tiene formato YYYYMMDDHHMMSSmmm (timestamp UTC con milisegundos).
     """
     try:
         with open(VERSION_FILE) as f:
@@ -459,12 +459,15 @@ def get_version() -> str:
 
 def bump_version() -> str:
     """
-    Genera una nueva versión como timestamp UTC (YYYYMMDDHHMMSS) y la escribe.
+    Genera una nueva versión como timestamp UTC (YYYYMMDDHHMMSSmmm) y la escribe.
 
+    Incluye milisegundos para minimizar colisiones cuando dos cambios ocurren
+    en el mismo segundo.
     Usa escritura atómica (fichero temporal + os.replace) para evitar
     que una interrupción deje el fichero de versión corrupto o vacío.
     """
-    version = _utcnow().strftime("%Y%m%d%H%M%S")
+    now = _utcnow()
+    version = now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}"
     tmp = VERSION_FILE + ".tmp"
     try:
         with open(tmp, "w") as f:
