@@ -3,8 +3,7 @@ set -e
 
 echo "[VAS] Ejecutando prerm..."
 
-# Si el servicio existe, detenerlo antes de eliminar archivos
-if systemctl list-unit-files | grep -q "^vas.service"; then
+if [ "$1" = "remove" ]; then
     systemctl stop vas.service || true
     systemctl disable vas.service || true
 fi

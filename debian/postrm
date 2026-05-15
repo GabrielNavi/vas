@@ -11,4 +11,6 @@ if [ "$1" = "purge" ]; then
     rm -rf /var/log/vas
 fi
 
+systemctl daemon-reload || true
+
 exit 0
