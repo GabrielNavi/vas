@@ -1,4 +1,4 @@
-vx-dga-l-vas (1.0-1~rc) unstable; urgency=medium
+vx-dga-l-vas (0.9-7~rc) unstable; urgency=medium
 
   * GET /clients: nuevo parámetro opcional ?extra_key=<clave>.
     Filtra la respuesta a los clientes que tengan esa clave presente en
