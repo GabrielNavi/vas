@@ -13,6 +13,8 @@ La integración con Veyon es **opcional y externa**: el paquete `vx-dga-l-veyon-
 ```
 vx-dga-l-vas          → registro canónico (este paquete)
 vx-dga-l-vac          → cliente de autoregistro (cada equipo)
+vx-dga-l-vcd          → consumidor genérico de inventario (hooks)
+vx-dga-l-vaf          → federación de servidores VAS en jerarquía
 vx-dga-l-veyon-sync   → integración Veyon opcional
 ```
 
@@ -24,7 +26,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 0.9-8~rc
+- Versión: 0.9-9~rc
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: Apache 2.0
