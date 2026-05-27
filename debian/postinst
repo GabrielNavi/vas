@@ -12,6 +12,7 @@ fi
 mkdir -p /var/lib/vas
 mkdir -p /var/log/vas
 mkdir -p /etc/vas/vas.conf.d
+mkdir -p /etc/vas/hooks.d
 
 chown -R vas:vas /var/lib/vas
 chown -R vas:vas /var/log/vas

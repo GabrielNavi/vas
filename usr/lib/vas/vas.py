@@ -56,6 +56,7 @@ def load_config() -> dict:
         "TTL_PURGE_DAYS":     "365",
         "LOG_LEVEL":          "normal",
         "LOG_FILE":           "",
+        "HOOKS_DIR":          "/etc/vas/hooks.d",
     }
 
     def _apply_file(path: str) -> None:
@@ -94,6 +95,8 @@ log_debug(
 # Inyectar rutas en el módulo database
 database.DB_PATH      = config["DB_PATH"]
 database.VERSION_FILE = config["VERSION_FILE"]
+database.HOOKS_DIR    = config["HOOKS_DIR"]
+database.VAS_BASE_URL = f"http://127.0.0.1:{config['PORT']}"
 
 
 # ---------------------------------------------------------------------------

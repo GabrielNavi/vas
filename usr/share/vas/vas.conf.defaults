@@ -40,3 +40,13 @@ LOG_LEVEL=normal
 
 # Fichero de log adicional con timestamp ISO-8601 UTC (vacío = solo stdout/journald).
 # LOG_FILE=/var/log/vas/vas.log
+
+# ---------------------------------------------------------------------------
+# Hooks de bump_version (notificación push)
+#
+# Directorio de scripts ejecutables lanzados en paralelo (fire and forget)
+# tras cada bump_version(). VAS no espera ni comprueba el resultado.
+# Variables de entorno disponibles: VAS_HOST (http://127.0.0.1:PORT), VAS_VERSION.
+# Ver /usr/share/vas/hooks.d.examples/ para hooks de ejemplo.
+# ---------------------------------------------------------------------------
+HOOKS_DIR=/etc/vas/hooks.d

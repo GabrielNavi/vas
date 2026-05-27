@@ -4,3 +4,4 @@ usr/bin/vas-cleanup usr/bin/
 etc/vas/vas.conf etc/vas/
 lib/systemd/system/vas.service lib/systemd/system/
 usr/share/vas/vas.conf.defaults usr/share/vas/
+usr/share/vas/hooks.d.examples/vcd-local usr/share/vas/hooks.d.examples/

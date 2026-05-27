@@ -18,6 +18,7 @@ Un cliente inactivo vuelve a 'active' automáticamente al hacer heartbeat.
 import json
 import sqlite3
 import os
+import subprocess
 import datetime
 from datetime import timezone
 
@@ -31,6 +32,8 @@ def _utcnow() -> datetime.datetime:
 # Inyectadas por vas.py antes del primer uso
 DB_PATH      = None
 VERSION_FILE = None
+HOOKS_DIR    = None
+VAS_BASE_URL = None
 
 
 def get_connection():
@@ -474,6 +477,23 @@ def get_version() -> str:
         return "0"
 
 
+def _run_hooks(version: str) -> None:
+    """Fire-and-forget: lanza en paralelo cada script ejecutable de HOOKS_DIR."""
+    if not HOOKS_DIR or not os.path.isdir(HOOKS_DIR):
+        return
+    env = {**os.environ, "VAS_VERSION": version}
+    if VAS_BASE_URL:
+        env["VAS_HOST"] = VAS_BASE_URL
+    for name in sorted(os.listdir(HOOKS_DIR)):
+        path = os.path.join(HOOKS_DIR, name)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            try:
+                subprocess.Popen([path], env=env, close_fds=True)
+                log_debug(f"[HOOKS] Lanzado: {name}")
+            except Exception as e:
+                log(f"[HOOKS] Error lanzando {name}: {e}")
+
+
 def bump_version() -> str:
     """
     Genera una nueva versión como timestamp UTC (YYYYMMDDHHMMSSmmm) y la escribe.
@@ -482,6 +502,8 @@ def bump_version() -> str:
     en el mismo segundo.
     Usa escritura atómica (fichero temporal + os.replace) para evitar
     que una interrupción deje el fichero de versión corrupto o vacío.
+    Tras escribir la versión lanza en paralelo (fire and forget) los hooks
+    de HOOKS_DIR para notificación push a consumidores VCD-Aware.
     """
     now = _utcnow()
     version = now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}"
@@ -493,4 +515,5 @@ def bump_version() -> str:
         log(f"[DB] Versión actualizada: {version}")
     except IOError as e:
         log(f"[DB] Error escribiendo versión ({VERSION_FILE}): {e}")
+    _run_hooks(version)
     return version

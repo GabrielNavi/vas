@@ -1,3 +1,19 @@
+vx-dga-l-vas (0.9-8~rc) unstable; urgency=medium
+
+  * Hooks de bump_version: VAS lanza en paralelo (fire and forget) los scripts
+    ejecutables de HOOKS_DIR tras cada bump_version(). No espera ni comprueba
+    el resultado. Los hooks no bloquean ni afectan al proceso VAS.
+  * HOOKS_DIR=/etc/vas/hooks.d (nueva variable en vas.conf): directorio de hooks.
+    Cada script recibe: VAS_HOST (URL base de esta instancia, http://127.0.0.1:PORT)
+    y VAS_VERSION (versión que disparó el evento).
+  * postinst: crea /etc/vas/hooks.d.
+  * usr/share/vas/hooks.d.examples/vcd-local: hook de ejemplo para notificación
+    push UDP a instancias VCD-Aware. Consulta GET /clients?extra_key=inform y
+    envía un datagrama UDP a cada cliente que tenga inform.url en extra_imperative.
+    Instalar con: cp vcd-local /etc/vas/hooks.d/ && chmod +x /etc/vas/hooks.d/vcd-local.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 19:00:00 +0200
+
 vx-dga-l-vas (0.9-7~rc) unstable; urgency=medium
 
   * GET /clients: nuevo parámetro opcional ?extra_key=<clave>.

@@ -24,7 +24,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 1.0-1~rc
+- Versión: 0.9-8~rc
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: Apache 2.0
@@ -39,8 +39,10 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 | `usr/bin/vas` | Wrapper de arranque (extrae PORT, lanza uvicorn) |
 | `usr/bin/vas-cleanup` | Herramienta interactiva de limpieza manual |
 | `etc/vas/vas.conf` | Configuración editable |
+| `etc/vas/hooks.d/` | Directorio de hooks de `bump_version` (creado vacío) |
 | `lib/systemd/system/vas.service` | Unidad systemd |
 | `usr/share/vas/vas.conf.defaults` | Referencia de valores por defecto (solo lectura) |
+| `usr/share/vas/hooks.d.examples/vcd-local` | Hook de ejemplo: notificación UDP a instancias VCD-Aware |
 
 ## API
 
@@ -114,8 +116,41 @@ Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
 | `TTL_PURGE_DAYS` | `365` | Días en `archived` antes de eliminar (0 = nunca) |
 | `LOG_LEVEL` | `normal` | Nivel de log: `no` (silencio), `normal` (eventos importantes), `debug` (detallado) |
 | `LOG_FILE` | — | Fichero de log adicional con timestamp ISO-8601 UTC (vacío = solo journald) |
+| `HOOKS_DIR` | `/etc/vas/hooks.d` | Directorio de scripts ejecutados tras cada `bump_version` (fire and forget) |
 
 > Los TTLs deben ser notablemente mayores que `CHECK_SECONDS` de los clientes VAC. Con `CHECK_SECONDS=300` y `TTL_INACTIVE_DAYS=30`, el margen es de más de 8000× .
+
+## Notificación push: hooks de bump_version
+
+Tras cada `bump_version()`, VAS lanza en paralelo (fire and forget) todos los scripts ejecutables de `HOOKS_DIR`. No espera resultados ni los registra en el flujo principal.
+
+Cada hook recibe:
+
+| Variable | Valor |
+|---|---|
+| `VAS_HOST` | URL base de esta instancia (`http://127.0.0.1:PORT`) |
+| `VAS_VERSION` | Versión que disparó el evento |
+
+### Hook vcd-local
+
+El hook de ejemplo `vcd-local` implementa la notificación push a instancias VCD-Aware:
+
+1. Consulta `GET /clients?extra_key=inform` — clientes que tengan la clave `inform` en sus extras.
+2. Para cada uno, envía un datagrama UDP a `extra_imperative.inform.url`.
+3. VCD-Aware recibe el UDP, interrumpe su `sleep` y consulta `/version` inmediatamente.
+
+```bash
+# Activar el hook
+cp /usr/share/vas/hooks.d.examples/vcd-local /etc/vas/hooks.d/
+chmod +x /etc/vas/hooks.d/vcd-local
+```
+
+El hook requiere que cada equipo cliente publique en VAC:
+```bash
+echo '{"url":"10.0.1.5:9876"}' | vac-register --imperative --key inform -
+```
+
+Y que VCD tenga `BUMP_LISTEN_PORT=9876` configurado. Ver documentación de VCD-Aware.
 
 ## Seguridad
 
