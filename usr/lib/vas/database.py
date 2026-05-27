@@ -488,7 +488,7 @@ def _run_hooks(version: str) -> None:
         path = os.path.join(HOOKS_DIR, name)
         if os.path.isfile(path) and os.access(path, os.X_OK):
             try:
-                subprocess.Popen([path], env=env, close_fds=True)
+                subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
                 log_debug(f"[HOOKS] Lanzado: {name}")
             except Exception as e:
                 log(f"[HOOKS] Error lanzando {name}: {e}")

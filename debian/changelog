@@ -1,3 +1,10 @@
+vx-dga-l-vas (0.9-9~rc) unstable; urgency=low
+
+  * database.py: _run_hooks() añade stdin=subprocess.DEVNULL al Popen
+    para evitar bloqueo cuando el hook lee stdin en entornos sin systemd.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 27 May 2026 22:00:00 +0200
+
 vx-dga-l-vas (0.9-8~rc) unstable; urgency=medium
 
   * Hooks de bump_version: VAS lanza en paralelo (fire and forget) los scripts
