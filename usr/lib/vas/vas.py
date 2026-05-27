@@ -9,7 +9,7 @@ Endpoints:
   POST /register            → registra o actualiza un cliente; retorna versión actual
   POST /heartbeat           → actualiza last_seen sin tocar datos ni versión
   GET  /version             → versión del registro (YYYYMMDDHHMMSS)
-  GET  /clients             → clientes activos (default) o filtrados por ?status=
+  GET  /clients             → clientes activos (default) o filtrados por ?status= y ?extra_key=
   GET  /clients/{id}        → cliente individual por UUID
 
 Ciclo de vida de clientes (gestionado en startup y por vas-cleanup):
@@ -335,25 +335,37 @@ def list_clients(
     status: str = Query(
         default="active",
         description="Filtro de estado: active (default) | inactive | archived | all",
-    )
+    ),
+    extra_key: str = Query(
+        default=None,
+        description="Filtro por clave de extra: retorna solo clientes que tengan "
+                    "esa clave en extra_imperative o extra_informative.",
+    ),
 ):
     """
-    Devuelve clientes filtrados por estado.
+    Devuelve clientes filtrados por estado y, opcionalmente, por clave de extra.
 
-    ?status=active   → solo activos (default; consumidores VAC/veyon-sync)
-    ?status=inactive → solo inactivos (sin heartbeat reciente)
-    ?status=archived → solo archivados (histórico)
-    ?status=all      → todos los estados
+    ?status=active              → solo activos (default)
+    ?status=inactive            → solo inactivos
+    ?status=archived            → solo archivados
+    ?status=all                 → todos los estados
+    ?extra_key=cups             → solo clientes con la clave 'cups' en algún campo extra
+    ?extra_key=hardware&status=all → combinable con status
 
-    Cada entrada incluye: id, hostname, ip, mac, status, last_seen.
+    La respuesta incluye el valor completo de extra_imperative y extra_informative;
+    el consumidor decide qué hacer con los campos extra devueltos.
     """
     valid = {"active", "inactive", "archived", "all"}
     if status not in valid:
         raise HTTPException(status_code=400, detail=f"status inválido. Valores: {sorted(valid)}")
 
     try:
-        clients = database.get_all_clients(status=status)
-        log_debug(f"[CLIENTS] Listado servido [{status}]: {len(clients)} cliente(s)")
+        clients = database.get_all_clients(status=status, extra_key=extra_key)
+        log_debug(
+            f"[CLIENTS] Listado servido [status={status}"
+            + (f" extra_key={extra_key}" if extra_key else "")
+            + f"]: {len(clients)} cliente(s)"
+        )
         return {"clients": clients}
     except Exception as e:
         log(f"[ERROR] Fallo en GET /clients: {e}")

@@ -24,7 +24,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 ## Información del paquete
 
 - Nombre: `vx-dga-l-vas`
-- Versión: 0.9-5~rc
+- Versión: 1.0-1~rc
 - Arquitectura: all
 - Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
 - Licencia: Apache 2.0
@@ -49,10 +49,12 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 | `POST` | `/register` | Registra o actualiza un cliente. Retorna `{status, version}`. |
 | `POST` | `/heartbeat` | Actualiza `last_seen`. Sube versión si el cliente era `inactive`/`archived` (reactivación). 404 si UUID desconocido. |
 | `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSSmmm`). |
-| `GET` | `/clients` | Clientes filtrados por `?status=` (default: `active`). |
+| `GET` | `/clients` | Clientes filtrados por `?status=` y/o `?extra_key=` (default: `active`). |
 | `GET` | `/clients/{id}` | Cliente individual por UUID. 404 si no existe. |
 
 La versión solo se incrementa cuando cambian datos reales de algún cliente o cuando un cliente pasa a `inactive`. Los heartbeats periódicos actualizan `last_seen` sin modificar la versión.
+
+`GET /clients` acepta `?extra_key=<clave>` para filtrar clientes que tengan esa clave en `extra_imperative` o `extra_informative`. Combinable con `?status=`. La respuesta incluye los campos extra completos; el consumidor decide qué hacer con ellos.
 
 ### Semántica de campos extra
 

@@ -267,16 +267,21 @@ def touch_client(client_id: str) -> None:
         log_debug(f"[DB] Heartbeat: {client_id}")
 
 
-def get_all_clients(status: str = "active") -> list:
+def get_all_clients(status: str = "active", extra_key: str | None = None) -> list:
     """
-    Devuelve clientes filtrados por status.
+    Devuelve clientes filtrados por status y, opcionalmente, por clave de extra.
 
     status='active'   → solo activos (default, consumidores normales)
     status='inactive' → solo inactivos
     status='archived' → solo archivados
     status='all'      → todos los estados (histórico completo)
 
-    Cada entrada incluye: id, hostname, ip, mac, status, last_seen.
+    extra_key=None    → sin filtro adicional (comportamiento original)
+    extra_key='cups'  → solo clientes que tengan 'cups' en extra_imperative
+                        o en extra_informative. El consumidor interpreta el valor.
+
+    Cada entrada incluye: hostname, ip, mac, status, last_seen,
+    extra_imperative, extra_informative (campos extra completos).
     Ordenado alfabéticamente por hostname.
     """
     conn = get_connection()
@@ -305,7 +310,7 @@ def get_all_clients(status: str = "active") -> list:
         except Exception:
             return None
 
-    return [
+    result = [
         {
             "hostname":          r[0],
             "ip":                r[1],
@@ -317,6 +322,18 @@ def get_all_clients(status: str = "active") -> list:
         }
         for r in rows
     ]
+
+    if extra_key:
+        # Predicado adicional: retener solo clientes que tengan la clave en
+        # alguno de los dos campos extra. El valor completo se incluye en la
+        # respuesta; el consumidor decide qué hacer con él.
+        result = [
+            c for c in result
+            if (c["extra_imperative"]  and extra_key in c["extra_imperative"])
+            or (c["extra_informative"] and extra_key in c["extra_informative"])
+        ]
+
+    return result
 
 
 def get_client(client_id: str) -> dict | None:
