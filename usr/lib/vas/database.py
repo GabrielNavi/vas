@@ -503,7 +503,7 @@ def bump_version() -> str:
     Usa escritura atómica (fichero temporal + os.replace) para evitar
     que una interrupción deje el fichero de versión corrupto o vacío.
     Tras escribir la versión lanza en paralelo (fire and forget) los hooks
-    de HOOKS_DIR para notificación push a consumidores VCD-Aware.
+    de HOOKS_DIR para notificación push a consumidores VAL-Aware.
     """
     now = _utcnow()
     version = now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}"

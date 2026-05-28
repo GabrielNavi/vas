@@ -14,10 +14,10 @@ vx-dga-l-vas (0.9-8~rc) unstable; urgency=medium
     Cada script recibe: VAS_HOST (URL base de esta instancia, http://127.0.0.1:PORT)
     y VAS_VERSION (versión que disparó el evento).
   * postinst: crea /etc/vas/hooks.d.
-  * usr/share/vas/hooks.d.examples/vcd-local: hook de ejemplo para notificación
-    push UDP a instancias VCD-Aware. Consulta GET /clients?extra_key=inform y
+  * usr/share/vas/hooks.d.examples/val-local: hook de ejemplo para notificación
+    push UDP a instancias VAL-Aware. Consulta GET /clients?extra_key=inform y
     envía un datagrama UDP a cada cliente que tenga inform.url en extra_imperative.
-    Instalar con: cp vcd-local /etc/vas/hooks.d/ && chmod +x /etc/vas/hooks.d/vcd-local.
+    Instalar con: cp val-local /etc/vas/hooks.d/ && chmod +x /etc/vas/hooks.d/val-local.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 19:00:00 +0200
 
@@ -58,7 +58,7 @@ vx-dga-l-vas (0.9-4~rc) unstable; urgency=low
   * database.py: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos)
     en lugar de YYYYMMDDHHMMSS (14 dígitos), añadiendo milisegundos UTC.
     Reduce el edge case de colisión cuando dos cambios ocurren en el mismo
-    segundo. Los consumidores (veyon-sync, vcd) usan ^[0-9]+$ y son
+    segundo. Los consumidores (veyon-sync, val) usan ^[0-9]+$ y son
     compatibles con cualquier longitud numérica sin cambios.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 17:00:00 +0200

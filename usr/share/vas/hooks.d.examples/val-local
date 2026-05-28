@@ -1,9 +1,9 @@
 #!/bin/bash
-# vcd-local — Hook de VAS: notifica por UDP a instancias VCD-Aware tras bump_version.
+# val-local — Hook de VAS: notifica por UDP a instancias VAL-Aware tras bump_version.
 #
 # Instalación:
-#   cp /usr/share/vas/hooks.d.examples/vcd-local /etc/vas/hooks.d/vcd-local
-#   chmod +x /etc/vas/hooks.d/vcd-local
+#   cp /usr/share/vas/hooks.d.examples/val-local /etc/vas/hooks.d/val-local
+#   chmod +x /etc/vas/hooks.d/val-local
 #
 # VAS lo lanza en background (fire and forget) tras cada bump_version().
 # Este script no bloquea ni afecta al proceso VAS.
@@ -12,16 +12,16 @@
 #   VAS_HOST    → URL base del servidor VAS (http://127.0.0.1:PORT)
 #   VAS_VERSION → versión que disparó el evento
 #
-# Requisito en cada equipo VCD-Aware:
+# Requisito en cada equipo VAL-Aware:
 #   VAC debe publicar en extra_imperative la clave "inform":
 #     {"url": "IP:PORT"}
-#   VCD debe tener BUMP_LISTEN_PORT=PORT configurado.
+#   VAL debe tener BUMP_LISTEN_PORT=PORT configurado.
 #
 # Flujo:
-#   VAS bump_version → hooks.d/vcd-local
+#   VAS bump_version → hooks.d/val-local
 #     → GET /clients?extra_key=inform
 #     → Por cada cliente: UDP "bump" a inform.url
-#     → VCD-Aware interrumpe su sleep y consulta /version inmediatamente
+#     → VAL-Aware interrumpe su sleep y consulta /version inmediatamente
 
 set -euo pipefail
 
@@ -30,12 +30,12 @@ VAS_VERSION="${VAS_VERSION:-?}"
 
 clients="$(curl -fsS --max-time 10 --connect-timeout 5 \
     "${VAS_HOST%/}/clients?extra_key=inform" 2>/dev/null)" || {
-    echo "[VCD-LOCAL] Error consultando VAS. Saliendo." >&2
+    echo "[VAL-LOCAL] Error consultando VAS. Saliendo." >&2
     exit 0
 }
 
 count="$(echo "$clients" | jq '.clients | length' 2>/dev/null || echo '?')"
-echo "[VCD-LOCAL] Versión $VAS_VERSION — $count cliente(s) con clave 'inform'."
+echo "[VAL-LOCAL] Versión $VAS_VERSION — $count cliente(s) con clave 'inform'."
 
 echo "$clients" \
     | jq -r '.clients[]? | .extra_imperative?.inform?.url // empty' 2>/dev/null \
@@ -44,8 +44,8 @@ echo "$clients" \
         host="${url%%:*}"
         port="${url##*:}"
         if echo "bump" | nc -u -w1 "$host" "$port" 2>/dev/null; then
-            echo "[VCD-LOCAL] UDP enviado → ${url}"
+            echo "[VAL-LOCAL] UDP enviado → ${url}"
         else
-            echo "[VCD-LOCAL] WARN: fallo enviando UDP → ${url}" >&2
+            echo "[VAL-LOCAL] WARN: fallo enviando UDP → ${url}" >&2
         fi
     done

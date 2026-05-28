@@ -13,7 +13,7 @@ La integración con Veyon es **opcional y externa**: el paquete `vx-dga-l-veyon-
 ```
 vx-dga-l-vas          → registro canónico (este paquete)
 vx-dga-l-vac          → cliente de autoregistro (cada equipo)
-vx-dga-l-vcd          → consumidor genérico de inventario (hooks)
+vx-dga-l-val          → consumidor genérico de inventario (hooks)
 vx-dga-l-vaf          → federación de servidores VAS en jerarquía
 vx-dga-l-veyon-sync   → integración Veyon opcional
 ```
@@ -44,7 +44,7 @@ vx-dga-l-veyon-sync   → integración Veyon opcional
 | `etc/vas/hooks.d/` | Directorio de hooks de `bump_version` (creado vacío) |
 | `lib/systemd/system/vas.service` | Unidad systemd |
 | `usr/share/vas/vas.conf.defaults` | Referencia de valores por defecto (solo lectura) |
-| `usr/share/vas/hooks.d.examples/vcd-local` | Hook de ejemplo: notificación UDP a instancias VCD-Aware |
+| `usr/share/vas/hooks.d.examples/val-local` | Hook de ejemplo: notificación UDP a instancias VAL-Aware |
 
 ## API
 
@@ -133,18 +133,18 @@ Cada hook recibe:
 | `VAS_HOST` | URL base de esta instancia (`http://127.0.0.1:PORT`) |
 | `VAS_VERSION` | Versión que disparó el evento |
 
-### Hook vcd-local
+### Hook val-local
 
-El hook de ejemplo `vcd-local` implementa la notificación push a instancias VCD-Aware:
+El hook de ejemplo `val-local` implementa la notificación push a instancias VAL-Aware:
 
 1. Consulta `GET /clients?extra_key=inform` — clientes que tengan la clave `inform` en sus extras.
 2. Para cada uno, envía un datagrama UDP a `extra_imperative.inform.url`.
-3. VCD-Aware recibe el UDP, interrumpe su `sleep` y consulta `/version` inmediatamente.
+3. VAL-Aware recibe el UDP, interrumpe su `sleep` y consulta `/version` inmediatamente.
 
 ```bash
 # Activar el hook
-cp /usr/share/vas/hooks.d.examples/vcd-local /etc/vas/hooks.d/
-chmod +x /etc/vas/hooks.d/vcd-local
+cp /usr/share/vas/hooks.d.examples/val-local /etc/vas/hooks.d/
+chmod +x /etc/vas/hooks.d/val-local
 ```
 
 El hook requiere que cada equipo cliente publique en VAC:
@@ -152,7 +152,7 @@ El hook requiere que cada equipo cliente publique en VAC:
 echo '{"url":"10.0.1.5:9876"}' | vac-register --imperative --key inform -
 ```
 
-Y que VCD tenga `BUMP_LISTEN_PORT=9876` configurado. Ver documentación de VCD-Aware.
+Y que VAL tenga `BUMP_LISTEN_PORT=9876` configurado. Ver documentación de VAL-Aware.
 
 ## Seguridad
 
