@@ -1,6 +1,6 @@
-# vx-dga-l-vas — Vitalinux Autoregistration Server
+# vx-dga-l-vas — Versatile Autoregistration Server
 
-Paquete Debian para Vitalinux que instala el servidor de inventario de red (VAS).
+Paquete Debian que instala el servidor de inventario de red (VAS).
 
 ## Descripción
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-vas.py — Vitalinux Autoregistration Server (VAS).
+vas.py — Versatile Autoregistration Server (VAS).
 
-Servidor FastAPI que mantiene el inventario de red de equipos Vitalinux.
+Servidor FastAPI que mantiene el inventario de red de equipos.
 Expone una API REST consumible por cualquier servicio (VAC, veyon-sync, etc.).
 
 Endpoints:

@@ -1,5 +1,5 @@
 [Unit]
-Description=Vitalinux Autoregistration Server (VAS)
+Description=Versatile Autoregistration Server (VAS)
 After=network.target
 
 [Service]
