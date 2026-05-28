@@ -1,11 +1,13 @@
 [Unit]
 Description=Versatile Autoregistration Server (VAS)
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 WorkingDirectory=/usr/lib/vas
 ExecStart=/usr/bin/vas
 Restart=always
+RestartSec=30
 User=vas
 Group=vas
 

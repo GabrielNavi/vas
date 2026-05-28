@@ -1,13 +1,13 @@
 Source: vx-dga-l-vas
 Priority: optional
 Maintainer: Gabriel Navia <correos@gabrielnav.es>
-Standards-Version: 4.6.0
+Standards-Version: 4.7.0
 Build-Depends: debhelper-compat (= 13)
 Section: admin
 
 Package: vx-dga-l-vas
 Architecture: all
-Depends: python3, python3-fastapi, python3-uvicorn, python3-pydantic
+Depends: python3, python3-fastapi, uvicorn | python3-uvicorn, python3-pydantic
 Description: Servidor de Autorregistro Versátil (VAS)
  Servicio HTTP+SQLite que mantiene un inventario en tiempo real de los
  equipos de la red: hostname, IP, MAC y última vez visto. Expone una API

@@ -1,3 +1,18 @@
+vx-dga-l-vas (0.9-10~rc) unstable; urgency=low
+
+  * vas.service: corregido After=network.target → After=network-online.target;
+    añadido Wants=network-online.target. Alineado con el resto del ecosistema.
+  * vas.service: añadido RestartSec=30, evita bucle de reinicio rápido ante
+    fallos de configuración o permisos al arrancar.
+  * vas-cleanup: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos),
+    alineado con database.py. Elimina la inconsistencia de formato donde
+    vas-cleanup producía versiones de 14 dígitos sin milisegundos.
+  * debian/control: uvicorn | python3-uvicorn (el paquete se llama uvicorn
+    en Debian Trixie; python3-uvicorn como alternativa para otras distros).
+  * debian/control: Standards-Version: 4.7.0.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Wed, 28 May 2026 14:30:00 +0200
+
 vx-dga-l-vas (0.9-9~rc) unstable; urgency=low
 
   * database.py: _run_hooks() añade stdin=subprocess.DEVNULL al Popen

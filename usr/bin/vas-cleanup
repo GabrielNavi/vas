@@ -227,7 +227,8 @@ version_bumped = False
 
 def bump_version():
     global version_bumped
-    v = utcnow().strftime("%Y%m%d%H%M%S")
+    now = utcnow()
+    v = now.strftime("%Y%m%d%H%M%S") + f"{now.microsecond // 1000:03d}"
     tmp = version_file + ".tmp"
     with open(tmp, "w") as f:
         f.write(v)
