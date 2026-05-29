@@ -1,3 +1,11 @@
+vx-dga-l-vas (0.9-14~rc) unstable; urgency=low
+
+  * vas.py: nuevo endpoint GET /health → {"status": "ok"}.
+    Sin side-effects ni entradas en el log. Para proxies inversos (nginx,
+    HAProxy) y monitorización externa.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 15:00:00 +0200
+
 vx-dga-l-vas (0.9-13~rc) unstable; urgency=low
 
   * vas.py: nuevo parser de duraciones parse_duration() — acepta 30d, 12h, 90m,

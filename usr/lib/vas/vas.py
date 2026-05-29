@@ -8,6 +8,7 @@ Expone una API REST consumible por cualquier servicio (VAC, veyon-sync, etc.).
 Endpoints:
   POST /register            → registra o actualiza un cliente; retorna versión actual
   POST /heartbeat           → actualiza last_seen sin tocar datos ni versión
+  GET  /health              → {"status": "ok"} sin side-effects (proxies y monitorización)
   GET  /version             → versión del registro (YYYYMMDDHHMMSS)
   GET  /clients             → clientes activos (default) o filtrados por ?status= y ?extra_key=
   GET  /clients/{id}        → cliente individual por UUID
@@ -297,6 +298,12 @@ class HeartbeatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
+@app.get("/health")
+def health():
+    """Healthcheck para proxies inversos y monitorización. Sin side-effects ni log."""
+    return {"status": "ok"}
+
 
 @app.post("/register")
 def register(client: Client):
