@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 # Lanzador del servidor VAS usando dependencias del sistema.
 # Permite sobrescribir el puerto desde /etc/vas/vas.conf.

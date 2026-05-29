@@ -5,7 +5,7 @@ echo "[VAS] Ejecutando postinst..."
 
 # Crear usuario de sistema si no existe
 if ! getent passwd vas > /dev/null 2>&1; then
-    adduser --system --no-create-home --group vas
+    adduser --system --no-create-home --group vas || true
 fi
 
 # Crear directorios persistentes con permisos correctos

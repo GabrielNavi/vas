@@ -1,3 +1,19 @@
+vx-dga-l-vas (0.9-12~rc) unstable; urgency=low
+
+  * usr/bin/vas: set -e → set -euo pipefail, alineado con el resto del ecosistema.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 11:00:00 +0200
+
+vx-dga-l-vas (0.9-11~rc) unstable; urgency=low
+
+  * vas-cleanup: conversión booleana a Python corregida — sustituye el
+    patrón '$DO_X && echo True || echo False' (dependía de /bin/false como
+    ejecutable por accidente) por '[[ "$DO_X" == "true" ]] && ... || ...'.
+  * debian/postinst: adduser con || true para tolerar reinstalaciones en
+    sistemas con backends NSS no estándar (LDAP, SSSD).
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 10:00:00 +0200
+
 vx-dga-l-vas (0.9-10~rc) unstable; urgency=low
 
   * vas.service: corregido After=network.target → After=network-online.target;

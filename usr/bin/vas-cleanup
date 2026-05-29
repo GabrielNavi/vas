@@ -188,9 +188,9 @@ ask_confirm "Se ejecutarán las siguientes operaciones:\n\n${SUMMARY}\n¿Continu
 # ---------------------------------------------------------------------------
 echo "[VAS-CLEANUP] Iniciando gestión de ciclo de vida..." >&2
 
-DO_INACTIVE_PY=$( $DO_INACTIVE && echo "True" || echo "False" )
-DO_ARCHIVE_PY=$(  $DO_ARCHIVE  && echo "True" || echo "False" )
-DO_PURGE_PY=$(    $DO_PURGE    && echo "True" || echo "False" )
+[[ "$DO_INACTIVE" == "true" ]] && DO_INACTIVE_PY="True" || DO_INACTIVE_PY="False"
+[[ "$DO_ARCHIVE"  == "true" ]] && DO_ARCHIVE_PY="True"  || DO_ARCHIVE_PY="False"
+[[ "$DO_PURGE"    == "true" ]] && DO_PURGE_PY="True"    || DO_PURGE_PY="False"
 
 DAYS_INACTIVE="${DAYS_INACTIVE:-0}"
 DAYS_ARCHIVE="${DAYS_ARCHIVE:-0}"
