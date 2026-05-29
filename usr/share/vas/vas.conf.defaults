@@ -19,20 +19,34 @@ DB_PATH=/var/lib/vas/vas.db
 #
 # Los consumidores normales (VAC, veyon-sync) solo ven clientes 'active'.
 # Un cliente inactivo vuelve a 'active' automáticamente al hacer heartbeat.
-# TTL_INACTIVE_DAYS debe ser notablemente mayor que CHECK_SECONDS de VAC.
+# TTL_INACTIVE debe ser notablemente mayor que CHECK_SECONDS de VAC.
 # Con CHECK_SECONDS=300 (5 min), cualquier valor > 1 día es seguro.
+#
+# Formato de duración: 30d, 12h, 90m, 60s. Sin sufijo: se asume días ([WARN]).
+# Ejemplos:  TTL_INACTIVE=30d  (30 días)
+#            TTL_INACTIVE=720h (equivalente a 30 días en horas)
+#            TTL_PURGE=0d      (borrado desactivado)
 # ---------------------------------------------------------------------------
 
-# Días sin heartbeat para marcar un cliente como 'inactive'
+# Tiempo sin heartbeat para marcar un cliente como 'inactive'
 # (sube versión → los consumidores dejan de verlo)
-TTL_INACTIVE_DAYS=30
+TTL_INACTIVE=30d
 
-# Días sin heartbeat para archivar un cliente 'inactive' (histórico)
-TTL_ARCHIVE_DAYS=90
+# Tiempo sin heartbeat para archivar un cliente 'inactive' (histórico)
+TTL_ARCHIVE=90d
 
-# Días sin heartbeat para borrar definitivamente un cliente 'archived'
-# 0 = nunca borrar (conservar histórico permanente)
-TTL_PURGE_DAYS=365
+# Tiempo sin heartbeat para borrar definitivamente un cliente 'archived'
+# 0d = nunca borrar (conservar histórico permanente)
+TTL_PURGE=365d
+
+# ---------------------------------------------------------------------------
+# Ciclo de vida periódico
+#
+# VAS ejecuta run_lifecycle() al arrancar y luego cada LIFECYCLE_INTERVAL.
+# Esto garantiza que los equipos inactivos cambian de estado aunque VAS
+# no se reinicie. Ajustar según la granularidad deseada.
+# ---------------------------------------------------------------------------
+LIFECYCLE_INTERVAL=24h
 
 # Nivel de logging: no (silencio total), normal (eventos importantes), debug (detallado).
 # Filtrar mensajes debug en journalctl: journalctl -u vas | grep '\[DEBUG\]'

@@ -17,9 +17,9 @@ CONFIG_DIR="/etc/vas/vas.conf.d"
 
 DB_PATH="/var/lib/vas/vas.db"
 VERSION_FILE="/var/lib/vas/version"
-TTL_INACTIVE=30
-TTL_ARCHIVE=90
-TTL_PURGE=365
+TTL_INACTIVE="30d"
+TTL_ARCHIVE="90d"
+TTL_PURGE="365d"
 
 # ---------------------------------------------------------------------------
 # Carga de configuración (parser seguro, sin source)
@@ -34,11 +34,11 @@ load_conf() {
         [ -z "$key" ] && continue
 
         case "$key" in
-            DB_PATH)           DB_PATH="$val"      ;;
-            VERSION_FILE)      VERSION_FILE="$val"  ;;
-            TTL_INACTIVE_DAYS) TTL_INACTIVE="$val"  ;;
-            TTL_ARCHIVE_DAYS)  TTL_ARCHIVE="$val"   ;;
-            TTL_PURGE_DAYS)    TTL_PURGE="$val"     ;;
+            DB_PATH)      DB_PATH="$val"      ;;
+            VERSION_FILE) VERSION_FILE="$val"  ;;
+            TTL_INACTIVE) TTL_INACTIVE="$val"  ;;
+            TTL_ARCHIVE)  TTL_ARCHIVE="$val"   ;;
+            TTL_PURGE)    TTL_PURGE="$val"     ;;
         esac
     done < <(grep -v '^\s*#' "$file" | grep '=' || true)
 }
@@ -51,6 +51,29 @@ if [ -d "$CONFIG_DIR" ]; then
         load_conf "$cfg"
     done
 fi
+
+# ---------------------------------------------------------------------------
+# Parser de duraciones
+# ---------------------------------------------------------------------------
+parse_duration_secs() {
+    local val="$1"
+    if [[ "$val" =~ ^([0-9]+)([sSmMhHdD])$ ]]; then
+        local num="${BASH_REMATCH[1]}"
+        local unit="${BASH_REMATCH[2],,}"   # lowercase
+        case "$unit" in
+            s) echo "$num" ;;
+            m) echo $(( num * 60 )) ;;
+            h) echo $(( num * 3600 )) ;;
+            d) echo $(( num * 86400 )) ;;
+        esac
+    elif [[ "$val" =~ ^[0-9]+$ ]]; then
+        echo "[WARN] Duración sin unidad: '$val'. Asumiendo días." >&2
+        echo $(( val * 86400 ))
+    else
+        echo "[ERROR] Duración inválida: '$val'. Formato: 30d, 12h, 90m, 60s." >&2
+        return 1
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Interfaz (zenity → dialog → CLI)
@@ -93,6 +116,53 @@ show_info() {
         dialog --msgbox "$msg" 10 60
     else
         echo "$msg"
+    fi
+}
+
+ask_duration() {
+    local prompt="$1" default="$2"
+
+    # Separar número y unidad del default (p.ej. "30d" → num=30 unit=d)
+    local default_num default_unit
+    if [[ "$default" =~ ^([0-9]+)([smhd])$ ]]; then
+        default_num="${BASH_REMATCH[1]}"
+        default_unit="${BASH_REMATCH[2]}"
+    else
+        default_num="${default//[^0-9]/}"
+        default_unit="d"
+    fi
+
+    local s_on=off m_on=off h_on=off d_on=off
+    case "$default_unit" in s) s_on=on;; m) m_on=on;; h) h_on=on;; d) d_on=on;; esac
+
+    if $use_zenity; then
+        local num unit
+        num=$(zenity --entry --title="VAS Cleanup" \
+            --text="$prompt — número:" \
+            --entry-text="$default_num") || exit 1
+        unit=$(zenity --list --title="VAS Cleanup" \
+            --text="Unidad para '$prompt':" \
+            --column="Código" --column="Unidad" \
+            "s" "Segundos" "m" "Minutos" "h" "Horas" "d" "Días") || exit 1
+        echo "${num}${unit:-d}"
+    elif $use_dialog; then
+        local num unit
+        num=$(dialog --stdout --inputbox "$prompt (número):" 8 60 "$default_num") || exit 1
+        unit=$(dialog --stdout --radiolist "Unidad para '$prompt':" 12 50 4 \
+            "s" "Segundos" "$s_on" \
+            "m" "Minutos"  "$m_on" \
+            "h" "Horas"    "$h_on" \
+            "d" "Días"     "$d_on") || exit 1
+        echo "${num}${unit:-d}"
+    else
+        local val
+        read -rp "$prompt [$default]: " val
+        val="${val:-$default}"
+        if [[ "$val" =~ ^[0-9]+$ ]]; then
+            echo "[WARN] Sin unidad en '$val', asumiendo días." >&2
+            val="${val}d"
+        fi
+        echo "$val"
     fi
 }
 
@@ -161,25 +231,25 @@ case "$CHOICE" in
 esac
 
 if $DO_INACTIVE; then
-    DAYS_INACTIVE="$(ask_input "Días sin heartbeat para marcar como INACTIVO:" "$TTL_INACTIVE")"
-    [[ "$DAYS_INACTIVE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_INACTIVE"; exit 1; }
+    DUR_INACTIVE="$(ask_duration "Tiempo sin heartbeat para marcar como INACTIVO" "$TTL_INACTIVE")"
+    [[ "$DUR_INACTIVE" =~ ^[0-9]+[smhd]?$ ]] || { show_info "Valor inválido: $DUR_INACTIVE"; exit 1; }
 fi
 
 if $DO_ARCHIVE; then
-    DAYS_ARCHIVE="$(ask_input "Días sin heartbeat para ARCHIVAR (inactive → archived):" "$TTL_ARCHIVE")"
-    [[ "$DAYS_ARCHIVE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_ARCHIVE"; exit 1; }
+    DUR_ARCHIVE="$(ask_duration "Tiempo sin heartbeat para ARCHIVAR (inactive → archived)" "$TTL_ARCHIVE")"
+    [[ "$DUR_ARCHIVE" =~ ^[0-9]+[smhd]?$ ]] || { show_info "Valor inválido: $DUR_ARCHIVE"; exit 1; }
 fi
 
 if $DO_PURGE; then
-    DAYS_PURGE="$(ask_input "Días sin heartbeat para BORRAR definitivamente (0 = desactivado):" "$TTL_PURGE")"
-    [[ "$DAYS_PURGE" =~ ^[0-9]+$ ]] || { show_info "Valor inválido: $DAYS_PURGE"; exit 1; }
+    DUR_PURGE="$(ask_duration "Tiempo sin heartbeat para BORRAR definitivamente (0d = desactivado)" "$TTL_PURGE")"
+    [[ "$DUR_PURGE" =~ ^[0-9]+[smhd]?$ ]] || { show_info "Valor inválido: $DUR_PURGE"; exit 1; }
 fi
 
 # Confirmación final
 SUMMARY=""
-$DO_INACTIVE && SUMMARY+="• Marcar inactivos: sin heartbeat desde hace ${DAYS_INACTIVE}d\n"
-$DO_ARCHIVE  && SUMMARY+="• Archivar: inactivos desde hace ${DAYS_ARCHIVE}d\n"
-$DO_PURGE    && SUMMARY+="• Purgar: archivados desde hace ${DAYS_PURGE}d (IRREVERSIBLE)\n"
+$DO_INACTIVE && SUMMARY+="• Marcar inactivos: sin heartbeat desde hace ${DUR_INACTIVE}\n"
+$DO_ARCHIVE  && SUMMARY+="• Archivar: inactivos desde hace ${DUR_ARCHIVE}\n"
+$DO_PURGE    && SUMMARY+="• Purgar: archivados desde hace ${DUR_PURGE} (IRREVERSIBLE)\n"
 
 ask_confirm "Se ejecutarán las siguientes operaciones:\n\n${SUMMARY}\n¿Continuar?"
 
@@ -192,16 +262,20 @@ echo "[VAS-CLEANUP] Iniciando gestión de ciclo de vida..." >&2
 [[ "$DO_ARCHIVE"  == "true" ]] && DO_ARCHIVE_PY="True"  || DO_ARCHIVE_PY="False"
 [[ "$DO_PURGE"    == "true" ]] && DO_PURGE_PY="True"    || DO_PURGE_PY="False"
 
-DAYS_INACTIVE="${DAYS_INACTIVE:-0}"
-DAYS_ARCHIVE="${DAYS_ARCHIVE:-0}"
-DAYS_PURGE="${DAYS_PURGE:-0}"
+SECS_INACTIVE=0; SECS_ARCHIVE=0; SECS_PURGE=0
+$DO_INACTIVE && SECS_INACTIVE="$(parse_duration_secs "${DUR_INACTIVE:-0d}")"
+$DO_ARCHIVE  && SECS_ARCHIVE="$(parse_duration_secs "${DUR_ARCHIVE:-0d}")"
+$DO_PURGE    && SECS_PURGE="$(parse_duration_secs "${DUR_PURGE:-0d}")"
 
 DO_INACTIVE_ENV="$DO_INACTIVE_PY" \
 DO_ARCHIVE_ENV="$DO_ARCHIVE_PY" \
 DO_PURGE_ENV="$DO_PURGE_PY" \
-DAYS_INACTIVE_ENV="$DAYS_INACTIVE" \
-DAYS_ARCHIVE_ENV="$DAYS_ARCHIVE" \
-DAYS_PURGE_ENV="$DAYS_PURGE" \
+SECS_INACTIVE_ENV="$SECS_INACTIVE" \
+SECS_ARCHIVE_ENV="$SECS_ARCHIVE" \
+SECS_PURGE_ENV="$SECS_PURGE" \
+DUR_INACTIVE_ENV="${DUR_INACTIVE:-0d}" \
+DUR_ARCHIVE_ENV="${DUR_ARCHIVE:-0d}" \
+DUR_PURGE_ENV="${DUR_PURGE:-0d}" \
 VAS_DB_PATH="$DB_PATH" \
 VAS_VERSION_FILE="$VERSION_FILE" \
 python3 <<'PYEOF'
@@ -216,9 +290,12 @@ version_file = os.environ["VAS_VERSION_FILE"]
 do_inactive  = os.environ["DO_INACTIVE_ENV"] == "True"
 do_archive   = os.environ["DO_ARCHIVE_ENV"]  == "True"
 do_purge     = os.environ["DO_PURGE_ENV"]    == "True"
-days_i       = int(os.environ["DAYS_INACTIVE_ENV"])
-days_a       = int(os.environ["DAYS_ARCHIVE_ENV"])
-days_p       = int(os.environ["DAYS_PURGE_ENV"])
+secs_i       = int(os.environ["SECS_INACTIVE_ENV"])
+secs_a       = int(os.environ["SECS_ARCHIVE_ENV"])
+secs_p       = int(os.environ["SECS_PURGE_ENV"])
+dur_i        = os.environ["DUR_INACTIVE_ENV"]
+dur_a        = os.environ["DUR_ARCHIVE_ENV"]
+dur_p        = os.environ["DUR_PURGE_ENV"]
 
 conn = sqlite3.connect(db_path)
 cur  = conn.cursor()
@@ -238,7 +315,7 @@ def bump_version():
 
 # Paso 1: active → inactive
 if do_inactive:
-    cutoff = utcnow() - datetime.timedelta(days=days_i)
+    cutoff = utcnow() - datetime.timedelta(seconds=secs_i)
     cur.execute(
         "UPDATE clients SET status='inactive' WHERE status='active' AND last_seen < ?",
         (cutoff,)
@@ -249,11 +326,11 @@ if do_inactive:
         v = bump_version()
         print(f"[VAS-CLEANUP] {n} cliente(s) → inactive. Versión publicada: {v}", flush=True)
     else:
-        print(f"[VAS-CLEANUP] Ningún cliente activo supera {days_i} días de inactividad.", flush=True)
+        print(f"[VAS-CLEANUP] Ningún cliente activo supera {dur_i} de inactividad.", flush=True)
 
 # Paso 2: inactive → archived
 if do_archive:
-    cutoff = utcnow() - datetime.timedelta(days=days_a)
+    cutoff = utcnow() - datetime.timedelta(seconds=secs_a)
     cur.execute(
         "UPDATE clients SET status='archived' WHERE status='inactive' AND last_seen < ?",
         (cutoff,)
@@ -263,14 +340,14 @@ if do_archive:
     if n > 0:
         print(f"[VAS-CLEANUP] {n} cliente(s) → archived.", flush=True)
     else:
-        print(f"[VAS-CLEANUP] Ningún cliente inactivo supera {days_a} días.", flush=True)
+        print(f"[VAS-CLEANUP] Ningún cliente inactivo supera {dur_a}.", flush=True)
 
 # Paso 3: archived → DELETE
 if do_purge:
-    if days_p == 0:
-        print("[VAS-CLEANUP] Purga desactivada (días=0).", flush=True)
+    if secs_p == 0:
+        print("[VAS-CLEANUP] Purga desactivada (0).", flush=True)
     else:
-        cutoff = utcnow() - datetime.timedelta(days=days_p)
+        cutoff = utcnow() - datetime.timedelta(seconds=secs_p)
         cur.execute(
             "DELETE FROM clients WHERE status='archived' AND last_seen < ?",
             (cutoff,)
@@ -280,7 +357,7 @@ if do_purge:
         if n > 0:
             print(f"[VAS-CLEANUP] {n} cliente(s) eliminado(s) definitivamente.", flush=True)
         else:
-            print(f"[VAS-CLEANUP] Ningún cliente archivado supera {days_p} días.", flush=True)
+            print(f"[VAS-CLEANUP] Ningún cliente archivado supera {dur_p}.", flush=True)
 
 conn.close()
 

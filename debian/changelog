@@ -1,3 +1,28 @@
+vx-dga-l-vas (0.9-13~rc) unstable; urgency=low
+
+  * vas.py: nuevo parser de duraciones parse_duration() — acepta 30d, 12h, 90m,
+    60s (insensible a mayúsculas). Sin sufijo: emite [WARN] y asume días.
+  * vas.py: renombradas las claves de configuración TTL_INACTIVE_DAYS,
+    TTL_ARCHIVE_DAYS, TTL_PURGE_DAYS → TTL_INACTIVE, TTL_ARCHIVE, TTL_PURGE.
+    Clean break (sin compat con claves antiguas); los valores usan el nuevo
+    parser de duraciones (30d, 90d, 365d por defecto).
+  * vas.py: nueva variable LIFECYCLE_INTERVAL (default: 24h) — controla la
+    frecuencia de la tarea periódica de ciclo de vida.
+  * vas.py: run_lifecycle() ahora se ejecuta periódicamente en background
+    (asyncio.create_task) cada LIFECYCLE_INTERVAL, además de en startup.
+    Corrige el bug donde equipos inactivos no cambiaban de estado sin reiniciar VAS.
+  * database.py: funciones mark_inactive_clients(), archive_clients(),
+    purge_clients() renombran el parámetro days→seconds y usan
+    timedelta(seconds=…). Nuevo helper _fmt_duration() para logs legibles.
+  * vas-cleanup: load_conf() actualizada a las nuevas claves TTL_*.
+    Nuevo parse_duration_secs() en bash. Nueva función ask_duration() con
+    selector de unidad (s/m/h/d): zenity usa lista, dialog usa radiolist,
+    terminal acepta cadena con sufijo y avisa si no hay unidad.
+  * vas.conf, vas.conf.defaults: renombradas las claves TTL_*, valores en
+    formato duración, añadido LIFECYCLE_INTERVAL=24h y ejemplos en .defaults.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 14:00:00 +0200
+
 vx-dga-l-vas (0.9-12~rc) unstable; urgency=low
 
   * usr/bin/vas: set -e → set -euo pipefail, alineado con el resto del ecosistema.

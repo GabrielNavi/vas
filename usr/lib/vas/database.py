@@ -29,6 +29,14 @@ def _utcnow() -> datetime.datetime:
     """Devuelve la hora UTC actual como datetime naive (compatible con CURRENT_TIMESTAMP de SQLite)."""
     return datetime.datetime.now(timezone.utc).replace(tzinfo=None)
 
+
+def _fmt_duration(secs: int) -> str:
+    """Formatea segundos como cadena legible (30d, 12h, 90m, 60s)."""
+    for unit, factor in (('d', 86400), ('h', 3600), ('m', 60)):
+        if secs % factor == 0:
+            return f"{secs // factor}{unit}"
+    return f"{secs}s"
+
 # Inyectadas por vas.py antes del primer uso
 DB_PATH      = None
 VERSION_FILE = None
@@ -375,14 +383,14 @@ def get_client(client_id: str) -> dict | None:
     }
 
 
-def mark_inactive_clients(days: int) -> int:
+def mark_inactive_clients(seconds: int) -> int:
     """
-    Marca como 'inactive' los clientes 'active' sin heartbeat en más de `days` días.
+    Marca como 'inactive' los clientes 'active' sin heartbeat en más de `seconds` segundos.
 
     Operación no destructiva: el registro se conserva, solo cambia status.
     Devuelve el número de clientes marcados.
     """
-    cutoff = _utcnow() - datetime.timedelta(days=days)
+    cutoff = _utcnow() - datetime.timedelta(seconds=seconds)
     conn   = get_connection()
     cur    = conn.cursor()
 
@@ -397,19 +405,19 @@ def mark_inactive_clients(days: int) -> int:
     conn.close()
 
     if marked > 0:
-        log(f"[DB] {marked} cliente(s) marcado(s) como inactive (TTL: {days}d).")
+        log(f"[DB] {marked} cliente(s) marcado(s) como inactive (TTL: {_fmt_duration(seconds)}).")
 
     return marked
 
 
-def archive_clients(days: int) -> int:
+def archive_clients(seconds: int) -> int:
     """
-    Mueve a 'archived' los clientes 'inactive' sin heartbeat en más de `days` días.
+    Mueve a 'archived' los clientes 'inactive' sin heartbeat en más de `seconds` segundos.
 
     Operación no destructiva: mantiene el histórico completo.
     Devuelve el número de clientes archivados.
     """
-    cutoff = _utcnow() - datetime.timedelta(days=days)
+    cutoff = _utcnow() - datetime.timedelta(seconds=seconds)
     conn   = get_connection()
     cur    = conn.cursor()
 
@@ -424,23 +432,23 @@ def archive_clients(days: int) -> int:
     conn.close()
 
     if archived > 0:
-        log(f"[DB] {archived} cliente(s) archivado(s) (TTL: {days}d).")
+        log(f"[DB] {archived} cliente(s) archivado(s) (TTL: {_fmt_duration(seconds)}).")
 
     return archived
 
 
-def purge_clients(days: int) -> int:
+def purge_clients(seconds: int) -> int:
     """
-    Elimina definitivamente los clientes 'archived' sin heartbeat en más de `days` días.
+    Elimina definitivamente los clientes 'archived' sin heartbeat en más de `seconds` segundos.
 
-    Operación destructiva e irreversible. Si days=0, no elimina nada.
+    Operación destructiva e irreversible. Si seconds=0, no elimina nada.
     Devuelve el número de clientes eliminados.
     """
-    if days == 0:
-        log_debug("[DB] TTL_PURGE_DAYS=0: borrado permanente desactivado.")
+    if seconds == 0:
+        log_debug("[DB] TTL_PURGE=0: borrado permanente desactivado.")
         return 0
 
-    cutoff = _utcnow() - datetime.timedelta(days=days)
+    cutoff = _utcnow() - datetime.timedelta(seconds=seconds)
     conn   = get_connection()
     cur    = conn.cursor()
 
@@ -454,7 +462,7 @@ def purge_clients(days: int) -> int:
     conn.close()
 
     if purged > 0:
-        log(f"[DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {days}d).")
+        log(f"[DB] {purged} cliente(s) eliminado(s) definitivamente (TTL: {_fmt_duration(seconds)}).")
 
     return purged
 

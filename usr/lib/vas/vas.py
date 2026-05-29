@@ -12,12 +12,13 @@ Endpoints:
   GET  /clients             → clientes activos (default) o filtrados por ?status= y ?extra_key=
   GET  /clients/{id}        → cliente individual por UUID
 
-Ciclo de vida de clientes (gestionado en startup y por vas-cleanup):
+Ciclo de vida de clientes (gestionado en startup y periódicamente vía LIFECYCLE_INTERVAL):
   active   → registrándose normalmente
-  inactive → sin heartbeat desde TTL_INACTIVE_DAYS días (sube versión)
-  archived → sin heartbeat desde TTL_ARCHIVE_DAYS días (histórico)
-  (purge)  → eliminación definitiva tras TTL_PURGE_DAYS (0 = nunca)
+  inactive → sin heartbeat desde TTL_INACTIVE (sube versión)
+  archived → sin heartbeat desde TTL_ARCHIVE (histórico)
+  (purge)  → eliminación definitiva tras TTL_PURGE (0 = nunca)
 """
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -30,6 +31,30 @@ from vas_log import log, log_debug, setup_logging
 
 CONFIG_FILE = "/etc/vas/vas.conf"
 CONFIG_DIR  = "/etc/vas/vas.conf.d"
+
+
+# ---------------------------------------------------------------------------
+# Parser de duraciones
+# ---------------------------------------------------------------------------
+
+def parse_duration(s: str) -> int:
+    """
+    Convierte una cadena de duración a segundos.
+
+    Formatos aceptados: 30d, 12h, 90m, 60s (insensible a mayúsculas).
+    Sin sufijo: emite [WARN] y asume días para compatibilidad.
+    Ejemplos: '30d' → 2592000, '12h' → 43200, '0d' → 0 (purga desactivada).
+    """
+    s = str(s).strip()
+    if not s:
+        raise ValueError("Duración vacía")
+    suffix = s[-1].lower()
+    multipliers = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400}
+    if suffix in multipliers:
+        return int(s[:-1]) * multipliers[suffix]
+    # Sin sufijo: asumir días con advertencia
+    log(f"[WARN] Duración sin unidad: '{s}'. Asumiendo días. Usa sufijo: s, m, h, d.")
+    return int(s) * 86400
 
 
 # ---------------------------------------------------------------------------
@@ -51,9 +76,10 @@ def load_config() -> dict:
         "PORT":               "8000",
         "DB_PATH":            "/var/lib/vas/vas.db",
         "VERSION_FILE":       "/var/lib/vas/version",
-        "TTL_INACTIVE_DAYS":  "30",
-        "TTL_ARCHIVE_DAYS":   "90",
-        "TTL_PURGE_DAYS":     "365",
+        "TTL_INACTIVE":       "30d",
+        "TTL_ARCHIVE":        "90d",
+        "TTL_PURGE":          "365d",
+        "LIFECYCLE_INTERVAL": "24h",
         "LOG_LEVEL":          "normal",
         "LOG_FILE":           "",
         "HOOKS_DIR":          "/etc/vas/hooks.d",
@@ -86,9 +112,10 @@ setup_logging(config["LOG_LEVEL"], config["LOG_FILE"])
 log_debug(
     f"[CONFIG] Configuración efectiva: "
     f"PORT={config['PORT']} DB={config['DB_PATH']} "
-    f"TTL_INACTIVE={config['TTL_INACTIVE_DAYS']}d "
-    f"TTL_ARCHIVE={config['TTL_ARCHIVE_DAYS']}d "
-    f"TTL_PURGE={config['TTL_PURGE_DAYS']}d "
+    f"TTL_INACTIVE={config['TTL_INACTIVE']} "
+    f"TTL_ARCHIVE={config['TTL_ARCHIVE']} "
+    f"TTL_PURGE={config['TTL_PURGE']} "
+    f"LIFECYCLE_INTERVAL={config['LIFECYCLE_INTERVAL']} "
     f"LOG_LEVEL={config['LOG_LEVEL']}"
 )
 
@@ -159,21 +186,22 @@ database.init_db()
 
 def run_lifecycle() -> None:
     """
-    Ejecuta las tres transiciones del ciclo de vida de clientes al arrancar VAS.
+    Ejecuta las tres transiciones del ciclo de vida de clientes.
 
-    1. active → inactive: clientes sin heartbeat desde TTL_INACTIVE_DAYS días.
-       Sube versión si hay cambios (los consumidores dejan de ver al equipo).
-    2. inactive → archived: clientes inactivos desde TTL_ARCHIVE_DAYS días.
-       No sube versión (ya estaban fuera del inventario activo).
-    3. archived → DELETE: eliminación definitiva tras TTL_PURGE_DAYS días.
-       TTL_PURGE_DAYS=0 desactiva el borrado (histórico permanente).
+    Llamado en startup y periódicamente cada LIFECYCLE_INTERVAL.
+    1. active → inactive: sin heartbeat desde TTL_INACTIVE. Sube versión.
+    2. inactive → archived: sin heartbeat desde TTL_ARCHIVE. No sube versión.
+    3. archived → DELETE: tras TTL_PURGE. TTL_PURGE=0 desactiva el borrado.
     """
-    ttl_inactive = int(config.get("TTL_INACTIVE_DAYS", 30))
-    ttl_archive  = int(config.get("TTL_ARCHIVE_DAYS",  90))
-    ttl_purge    = int(config.get("TTL_PURGE_DAYS",   365))
+    ttl_inactive = parse_duration(config.get("TTL_INACTIVE", "30d"))
+    ttl_archive  = parse_duration(config.get("TTL_ARCHIVE",  "90d"))
+    ttl_purge    = parse_duration(config.get("TTL_PURGE",   "365d"))
 
     log_debug(
-        f"[LIFECYCLE] TTL inactive={ttl_inactive}d archive={ttl_archive}d purge={ttl_purge}d"
+        f"[LIFECYCLE] TTL "
+        f"inactive={config.get('TTL_INACTIVE','30d')} "
+        f"archive={config.get('TTL_ARCHIVE','90d')} "
+        f"purge={config.get('TTL_PURGE','365d')}"
     )
 
     marked = database.mark_inactive_clients(ttl_inactive)
@@ -196,12 +224,22 @@ def run_lifecycle() -> None:
 # Ciclo de vida de la aplicación (startup / shutdown)
 # ---------------------------------------------------------------------------
 
+async def _lifecycle_loop(interval: int) -> None:
+    """Ejecuta run_lifecycle() cada `interval` segundos en background."""
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            run_lifecycle()
+        except Exception as e:
+            log(f"[ERROR] Fallo en lifecycle periódico (no fatal): {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Contexto de vida de la aplicación FastAPI.
 
-    En startup ejecuta run_lifecycle() para gestionar los estados de los clientes.
+    En startup ejecuta run_lifecycle() y arranca la tarea periódica de lifecycle.
     Los errores no bloquean el arranque (la limpieza es mantenimiento no crítico).
     """
     log(
@@ -214,8 +252,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log(f"[ERROR] Fallo en startup (no fatal): {e}")
 
+    interval = parse_duration(config.get("LIFECYCLE_INTERVAL", "24h"))
+    log_debug(f"[LIFECYCLE] Tarea periódica cada {config.get('LIFECYCLE_INTERVAL','24h')}.")
+    task = asyncio.create_task(_lifecycle_loop(interval))
+
     yield  # La aplicación sirve peticiones a partir de aquí
 
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
     log("[SHUTDOWN] Cerrando VAS.")
 
 
