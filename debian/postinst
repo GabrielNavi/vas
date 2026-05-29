@@ -34,6 +34,14 @@ if [ "$1" = "configure" ]; then
     if [ -n "${2:-}" ]; then
         systemctl restart vas.service || true
     else
+        # Instalación fresca: activar hook val-local (notificación push a VAL-Aware)
+        HOOK_SRC="/usr/share/vas/hooks.d.examples/val-local"
+        HOOK_DST="/etc/vas/hooks.d/val-local"
+        if [ -f "$HOOK_SRC" ] && [ ! -f "$HOOK_DST" ]; then
+            cp "$HOOK_SRC" "$HOOK_DST"
+            chmod +x "$HOOK_DST"
+            echo "[VAS] Hook val-local instalado en $HOOK_DST"
+        fi
         systemctl start vas.service || true
     fi
 fi

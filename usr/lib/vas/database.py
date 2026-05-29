@@ -42,6 +42,7 @@ DB_PATH      = None
 VERSION_FILE = None
 HOOKS_DIR    = None
 VAS_BASE_URL = None
+HOOKS_LOG    = None
 
 
 def get_connection():
@@ -486,7 +487,11 @@ def get_version() -> str:
 
 
 def _run_hooks(version: str) -> None:
-    """Fire-and-forget: lanza en paralelo cada script ejecutable de HOOKS_DIR."""
+    """Fire-and-forget: lanza en paralelo cada script ejecutable de HOOKS_DIR.
+
+    Por defecto stdout/stderr heredan de VAS → journald los captura con [VAS].
+    Si HOOKS_LOG está definido, redirige stdout/stderr del hook a ese fichero.
+    """
     if not HOOKS_DIR or not os.path.isdir(HOOKS_DIR):
         return
     env = {**os.environ, "VAS_VERSION": version}
@@ -496,7 +501,15 @@ def _run_hooks(version: str) -> None:
         path = os.path.join(HOOKS_DIR, name)
         if os.path.isfile(path) and os.access(path, os.X_OK):
             try:
-                subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
+                if HOOKS_LOG:
+                    lf = open(HOOKS_LOG, "a")
+                    subprocess.Popen(
+                        [path], env=env, close_fds=True, stdin=subprocess.DEVNULL,
+                        stdout=lf, stderr=lf,
+                    )
+                    lf.close()
+                else:
+                    subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
                 log_debug(f"[HOOKS] Lanzado: {name}")
             except Exception as e:
                 log(f"[HOOKS] Error lanzando {name}: {e}")

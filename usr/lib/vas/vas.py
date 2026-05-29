@@ -84,6 +84,7 @@ def load_config() -> dict:
         "LOG_LEVEL":          "normal",
         "LOG_FILE":           "",
         "HOOKS_DIR":          "/etc/vas/hooks.d",
+        "HOOKS_LOG":          "",
     }
 
     def _apply_file(path: str) -> None:
@@ -124,6 +125,7 @@ log_debug(
 database.DB_PATH      = config["DB_PATH"]
 database.VERSION_FILE = config["VERSION_FILE"]
 database.HOOKS_DIR    = config["HOOKS_DIR"]
+database.HOOKS_LOG    = config["HOOKS_LOG"] or None
 database.VAS_BASE_URL = f"http://127.0.0.1:{config['PORT']}"
 
 

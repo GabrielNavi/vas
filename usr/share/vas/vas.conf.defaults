@@ -64,3 +64,11 @@ LOG_LEVEL=normal
 # Ver /usr/share/vas/hooks.d.examples/ para hooks de ejemplo.
 # ---------------------------------------------------------------------------
 HOOKS_DIR=/etc/vas/hooks.d
+
+# Fichero de log para stdout/stderr de los hooks.
+# Vacío (default) → los hooks heredan stdout/stderr de VAS; journald los captura
+#   junto al resto de mensajes [VAS]. Útil para ver la actividad hook en journalctl.
+# Ruta → VAS redirige stdout/stderr de cada hook a este fichero (append).
+#   El directorio debe existir y ser escribible por el usuario vas.
+#   Por convención: /var/log/vas/hooks.log
+# HOOKS_LOG=/var/log/vas/hooks.log

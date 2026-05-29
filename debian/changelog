@@ -1,3 +1,17 @@
+vx-dga-l-vas (0.9-15~rc) unstable; urgency=low
+
+  * postinst: en instalación fresca, copia val-local desde
+    /usr/share/vas/hooks.d.examples/ a /etc/vas/hooks.d/ con chmod +x.
+    En upgrade se respeta la decisión del admin (no se sobreescribe).
+  * database.py: _run_hooks() soporta HOOKS_LOG. Vacío (default): hooks
+    heredan stdout/stderr de VAS → journald los captura con [VAS]. Si
+    HOOKS_LOG está definido, redirige stdout/stderr de cada hook a ese fichero.
+    fire-and-forget intacto; hooks solo necesitan echo.
+  * vas.py: añadido HOOKS_LOG a load_config() e inyectado en database.HOOKS_LOG.
+  * vas.conf, vas.conf.defaults: añadido HOOKS_LOG comentado con descripción.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Fri, 30 May 2026 10:00:00 +0200
+
 vx-dga-l-vas (0.9-14~rc) unstable; urgency=low
 
   * vas.py: nuevo endpoint GET /health → {"status": "ok"}.
