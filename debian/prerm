@@ -1,11 +1,4 @@
 #!/bin/sh
 set -e
 
-echo "[VAS] Ejecutando prerm..."
-
-if [ "$1" = "remove" ]; then
-    systemctl stop vas.service || true
-    systemctl disable vas.service || true
-fi
-
-exit 0
+#DEBHELPER#
