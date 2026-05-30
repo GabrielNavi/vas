@@ -502,12 +502,11 @@ def _run_hooks(version: str) -> None:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             try:
                 if HOOKS_LOG:
-                    lf = open(HOOKS_LOG, "a")
-                    subprocess.Popen(
-                        [path], env=env, close_fds=True, stdin=subprocess.DEVNULL,
-                        stdout=lf, stderr=lf,
-                    )
-                    lf.close()
+                    with open(HOOKS_LOG, "a") as lf:
+                        subprocess.Popen(
+                            [path], env=env, close_fds=True, stdin=subprocess.DEVNULL,
+                            stdout=lf, stderr=lf,
+                        )
                 else:
                     subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
                 log_debug(f"[HOOKS] Lanzado: {name}")
