@@ -15,6 +15,8 @@
 # Requisito en cada equipo VAL-Aware:
 #   VAC debe publicar en extra_imperative la clave "inform":
 #     {"url": "IP:PORT"}
+#   El nombre del script en extras_imperative.d DEBE ser "inform.sh" (la clave
+#   en VAS es el basename del script sin extensión).
 #   VAL debe tener BUMP_LISTEN_PORT=PORT configurado.
 #
 # Flujo:
@@ -41,6 +43,8 @@ echo "$clients" \
     | jq -r '.clients[]? | .extra_imperative?.inform?.url // empty' 2>/dev/null \
     | while IFS= read -r url; do
         [[ -z "$url" ]] && continue
+        # Eliminar scheme si está presente (ej. udp://host:port → host:port)
+        url="${url#*://}"
         host="${url%%:*}"
         port="${url##*:}"
         if echo "bump" | nc -u -w1 "$host" "$port" 2>/dev/null; then

@@ -491,27 +491,37 @@ def _run_hooks(version: str) -> None:
 
     Por defecto stdout/stderr heredan de VAS → journald los captura con [VAS].
     Si HOOKS_LOG está definido, redirige stdout/stderr del hook a ese fichero.
+
+    Cada hook se lanza en un hilo daemon que llama a wait() tras Popen para
+    evitar que el proceso hijo quede zombie cuando VAS no hace waitpid().
     """
+    import threading
+
     if not HOOKS_DIR or not os.path.isdir(HOOKS_DIR):
         return
     env = {**os.environ, "VAS_VERSION": version}
     if VAS_BASE_URL:
         env["VAS_HOST"] = VAS_BASE_URL
+
+    def _launch(path: str) -> None:
+        try:
+            if HOOKS_LOG:
+                with open(HOOKS_LOG, "a") as lf:
+                    p = subprocess.Popen(
+                        [path], env=env, close_fds=True, stdin=subprocess.DEVNULL,
+                        stdout=lf, stderr=lf,
+                    )
+            else:
+                p = subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
+            p.wait()  # reap child; sin esto queda zombie hasta que VAS termina
+        except Exception as e:
+            log(f"[HOOKS] Error lanzando {path}: {e}")
+
     for name in sorted(os.listdir(HOOKS_DIR)):
         path = os.path.join(HOOKS_DIR, name)
         if os.path.isfile(path) and os.access(path, os.X_OK):
-            try:
-                if HOOKS_LOG:
-                    with open(HOOKS_LOG, "a") as lf:
-                        subprocess.Popen(
-                            [path], env=env, close_fds=True, stdin=subprocess.DEVNULL,
-                            stdout=lf, stderr=lf,
-                        )
-                else:
-                    subprocess.Popen([path], env=env, close_fds=True, stdin=subprocess.DEVNULL)
-                log_debug(f"[HOOKS] Lanzado: {name}")
-            except Exception as e:
-                log(f"[HOOKS] Error lanzando {name}: {e}")
+            threading.Thread(target=_launch, args=(path,), daemon=True).start()
+            log_debug(f"[HOOKS] Lanzado: {name}")
 
 
 def bump_version() -> str:

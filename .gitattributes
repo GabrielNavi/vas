@@ -1,0 +1,2 @@
+# Force LF line endings for all text files (Linux package sources built on Windows)
+* text=auto eol=lf

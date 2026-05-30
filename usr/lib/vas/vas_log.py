@@ -50,7 +50,7 @@ def log(msg: str) -> None:
 
 def log_debug(msg: str) -> None:
     """Mensaje de nivel debug: solo visible con LOG_LEVEL=debug.
-    Filtrar con: journalctl -u vas | grep '\[DEBUG\]'
+    Filtrar con: journalctl -u vas | grep '\\[DEBUG\\]'
     """
     if _level != "debug":
         return

@@ -2,6 +2,6 @@ usr/lib/vas/* usr/lib/vas/
 usr/bin/vas usr/bin/
 usr/bin/vas-cleanup usr/bin/
 etc/vas/vas.conf etc/vas/
-lib/systemd/system/vas.service lib/systemd/system/
+lib/systemd/system/vas.service usr/lib/systemd/system/
 usr/share/vas/vas.conf.defaults usr/share/vas/
 usr/share/vas/hooks.d.examples/val-local usr/share/vas/hooks.d.examples/

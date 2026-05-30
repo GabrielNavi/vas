@@ -1,0 +1,169 @@
+.TH VAS 8 "2026-05-30" "vx-dga-l-vas" "System Administration"
+.SH NAME
+vas \- Versatile Autoregistration Server
+.SH SYNOPSIS
+.B vas
+.SH DESCRIPTION
+.B vas
+is a lightweight HTTP REST server that maintains a real-time network
+inventory of registered equipment.
+It stores each client's hostname, IP address, MAC address, last-seen
+timestamp, and two extensible extra-field dictionaries in a SQLite database.
+.PP
+Clients register and send heartbeats using
+.BR vac (8).
+Consumers such as
+.BR val (8)
+poll the version endpoint to detect changes and retrieve the filtered
+inventory.
+.SH CLIENT LIFECYCLE
+Each registered client transitions through the following states:
+.TP
+.B active
+The client is registering or sending heartbeats normally.
+.TP
+.B inactive
+No heartbeat received within
+.BR TTL_INACTIVE .
+The version is bumped so consumers detect the change.
+.TP
+.B archived
+No heartbeat received within
+.BR TTL_ARCHIVE .
+The record is retained for historical reference.
+.TP
+.B (purged)
+Definitively deleted after
+.BR TTL_PURGE .
+Set
+.B TTL_PURGE=0d
+to disable permanent deletion.
+.PP
+A client in
+.B inactive
+or
+.B archived
+state is automatically reactivated upon the next
+.B POST /register
+or
+.B POST /heartbeat
+request.
+.SH API ENDPOINTS
+.TP
+.B POST /register
+Register or update a client. Bumps the version if data or status changed.
+Returns
+.BR {"status":"ok","version":"..."} .
+.TP
+.B POST /heartbeat
+Lightweight liveness update. Only touches
+.IR last_seen .
+Returns 404 if the UUID is unknown (client must re-register).
+.TP
+.B GET /health
+Returns
+.B {"status":"ok"}
+with no side-effects. Intended for reverse proxies and monitoring.
+.TP
+.B GET /version
+Returns the current inventory version as a numeric timestamp
+.RI ( YYYYMMDDHHMMSSmmm ).
+.TP
+.B GET /clients
+Returns the client list filtered by
+.B ?status=
+.RI ( active | inactive | archived | all ,
+default
+.BR active )
+and optionally by
+.B ?extra_key=
+.IR key .
+.TP
+.BI "GET /clients/" uuid
+Returns the full record of a single client including its UUID.
+.SH CONFIGURATION
+.B vas
+reads
+.I /etc/vas/vas.conf
+and all
+.B *.conf
+overlays in
+.IR /etc/vas/vas.conf.d/ .
+.PP
+Key configuration variables:
+.TP
+.B PORT
+TCP port to listen on (default:
+.BR 8000 ).
+.TP
+.B DB_PATH
+Path to the SQLite database (default:
+.IR /var/lib/vas/vas.db ).
+.TP
+.B TTL_INACTIVE
+Time without heartbeat before marking a client inactive (default:
+.BR 30d ).
+Accepts suffixes:
+.BR d ,
+.BR h ,
+.BR m ,
+.BR s .
+.TP
+.B TTL_ARCHIVE
+Time without heartbeat before archiving an inactive client (default:
+.BR 90d ).
+.TP
+.B TTL_PURGE
+Time without heartbeat before permanently deleting an archived client
+(default:
+.BR 365d ;
+.B 0d
+= never).
+.TP
+.B LIFECYCLE_INTERVAL
+How often the lifecycle transitions are re-evaluated (default:
+.BR 24h ).
+.TP
+.B HOOKS_DIR
+Directory of scripts executed (fire-and-forget) after each version bump
+(default:
+.IR /etc/vas/hooks.d ).
+.TP
+.B LOG_LEVEL
+Log verbosity:
+.B no
+|
+.B normal
+|
+.B debug
+(default:
+.BR normal ).
+.SH FILES
+.TP
+.I /etc/vas/vas.conf
+Main configuration file.
+.TP
+.I /etc/vas/vas.conf.d/
+Drop-in configuration overlays, applied in lexical order.
+.TP
+.I /etc/vas/hooks.d/
+Hook scripts executed after each inventory version bump.
+.TP
+.I /var/lib/vas/vas.db
+SQLite database containing the client inventory.
+.TP
+.I /var/lib/vas/version
+Plain-text file with the current inventory version.
+.TP
+.I /usr/share/vas/vas.conf.defaults
+Reference copy of all configuration variables with documentation.
+.TP
+.I /usr/share/vas/hooks.d.examples/val-local
+Example hook that sends UDP push notifications to VAL-Aware listeners.
+.SH SEE ALSO
+.BR vas-cleanup (8),
+.BR vac (8),
+.BR val (8),
+.BR systemctl (1)
+.SH AUTHOR
+Gabriel Navia <correos@gabrielnav.es>

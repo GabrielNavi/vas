@@ -1,10 +1,24 @@
+vx-dga-l-vas (0.9-17~rc) unstable; urgency=low
+
+  * vas.py: valida que id e ip no vayan vacíos y recorta espacios; el
+    heartbeat también rechaza ids vacíos.
+  * database.py: los hooks se lanzan en hilos daemon y se reaping con wait()
+    para evitar procesos zombie.
+  * val-local: admite URLs con scheme en extra_imperative.inform y documenta
+    el nombre inform.sh para el hook esperado. Se añaden manpages para vas y
+    vas-cleanup.
+  * Paquetería: movido el unit file al destino correcto de systemd y
+    afinados los scripts de instalación para cumplir lintian.
+
+ -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 19:00:00 +0200
+
 vx-dga-l-vas (0.9-16~rc) unstable; urgency=low
 
   * database.py: _run_hooks() usa ahora `with open(HOOKS_LOG, "a") as lf`
     en lugar de open/close manual. Evita que el file handle quede abierto
     si Popen lanza una excepción antes de llegar al close().
 
- -- Gabriel Navia <correos@gabrielnav.es>  Fri, 30 May 2026 18:00:00 +0200
+ -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 18:00:00 +0200
 
 vx-dga-l-vas (0.9-15~rc) unstable; urgency=low
 

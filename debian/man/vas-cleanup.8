@@ -1,0 +1,68 @@
+.TH VAS-CLEANUP 8 "2026-05-30" "vx-dga-l-vas" "System Administration"
+.SH NAME
+vas-cleanup \- Interactive lifecycle tool for the VAS inventory
+.SH SYNOPSIS
+.B vas-cleanup
+.SH DESCRIPTION
+.B vas-cleanup
+is an interactive utility that triggers client lifecycle transitions in
+.BR vas (8)
+without restarting the service.
+It reads the same configuration as
+.B vas
+and connects to the running SQLite database directly.
+.PP
+The interface adapts to the available terminal:
+Zenity (graphical desktop), dialog (ncurses terminal), or plain text menu
+(any terminal).
+.SH OPERATIONS
+.TP
+.B Mark inactive
+Transitions
+.B active
+clients that have not sent a heartbeat within the specified duration to
+.BR inactive .
+This bumps the inventory version so consumers detect the change.
+.TP
+.B Archive
+Transitions
+.B inactive
+clients that have not sent a heartbeat within the specified duration to
+.BR archived .
+Non-destructive; the record is retained.
+.TP
+.B Purge
+Permanently deletes
+.B archived
+clients that have not sent a heartbeat within the specified duration.
+This operation is irreversible.
+.TP
+.B Full cycle
+Runs mark-inactive, archive, and purge in sequence using the durations
+configured in
+.IR /etc/vas/vas.conf .
+.SH DURATION FORMAT
+Each operation asks for an inactivity threshold. Accepted formats:
+.PP
+.RS
+.nf
+30d   \(em 30 days
+12h   \(em 12 hours
+90m   \(em 90 minutes
+60s   \(em 60 seconds
+.fi
+.RE
+.PP
+If no unit suffix is provided a warning is issued and days are assumed.
+.SH FILES
+.TP
+.I /etc/vas/vas.conf
+Configuration file (same as
+.BR vas (8)).
+.TP
+.I /var/lib/vas/vas.db
+SQLite database operated on directly.
+.SH SEE ALSO
+.BR vas (8)
+.SH AUTHOR
+Gabriel Navia <correos@gabrielnav.es>

@@ -5,12 +5,12 @@ case "$1" in
     configure)
         # Crear usuario de sistema si no existe
         if ! getent passwd vas > /dev/null 2>&1; then
-            adduser --system --no-create-home --group vas || true
+            adduser --system --no-create-home --home /nonexistent --group vas || true
         fi
 
         # Crear directorios persistentes
         mkdir -p /var/lib/vas /var/log/vas /etc/vas/vas.conf.d /etc/vas/hooks.d
-        chown -R vas:vas /var/lib/vas /var/log/vas
+        chown vas:vas /var/lib/vas /var/log/vas
 
         # Inicializar fichero de versión
         if [ ! -f /var/lib/vas/version ]; then
