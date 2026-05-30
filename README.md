@@ -1,188 +1,107 @@
 # vx-dga-l-vas — Versatile Autoregistration Server
 
-Paquete Debian que instala el servidor de inventario de red (VAS).
-
-## Descripción
-
-VAS mantiene un registro en tiempo real de los equipos presentes en la red: UUID persistente, hostname, IP, MAC y última vez visto (`last_seen`). Expone una API REST consumible por cualquier servicio: clientes VAC, sincronizadores Veyon, sistemas LDAP, herramientas de monitorización, etc.
-
-La integración con Veyon es **opcional y externa**: el paquete `vx-dga-l-veyon-sync` actúa como consumidor independiente del registro, sin que VAS conozca ni dependa de Veyon.
+Servidor de inventario de red ligero. Mantiene el registro canónico de equipos activos, inactivos y archivados mediante una API REST minimalista. Diseñado para redes educativas con centenares de equipos Linux gestionados centralmente.
 
 ## Ecosistema
 
 ```
-vx-dga-l-vas          → registro canónico (este paquete)
+vx-dga-l-vas          → servidor de inventario (este paquete)
 vx-dga-l-vac          → cliente de autoregistro (cada equipo)
-vx-dga-l-val          → consumidor genérico de inventario (hooks)
-vx-dga-l-vaf          → federación de servidores VAS en jerarquía
-vx-dga-l-veyon-sync   → integración Veyon opcional
+vx-dga-l-val          → consumidor genérico con hooks
+vx-dga-l-veyon-sync   → integración Veyon opcional (legacy)
 ```
 
 ## Requisitos
 
-- Python 3 con `python3-fastapi`, `python3-uvicorn`, `python3-pydantic`
+- `python3`, `python3-fastapi`, `uvicorn | python3-uvicorn`, `python3-pydantic`
 - systemd
-
-## Información del paquete
-
-- Nombre: `vx-dga-l-vas`
-- Versión: 0.9-9~rc
-- Arquitectura: all
-- Mantenedor: Gabriel Navia \<correos@gabrielnav.es\>
-- Licencia: Apache 2.0
 
 ## Archivos instalados
 
 | Ruta | Descripción |
 |---|---|
-| `usr/lib/vas/vas.py` | Aplicación FastAPI principal |
-| `usr/lib/vas/database.py` | Capa de persistencia SQLite |
-| `usr/lib/vas/vas_log.py` | Funciones de logging compartidas (log, log_debug) |
-| `usr/bin/vas` | Wrapper de arranque (extrae PORT, lanza uvicorn) |
-| `usr/bin/vas-cleanup` | Herramienta interactiva de limpieza manual |
-| `etc/vas/vas.conf` | Configuración editable |
-| `etc/vas/hooks.d/` | Directorio de hooks de `bump_version` (creado vacío) |
-| `lib/systemd/system/vas.service` | Unidad systemd |
-| `usr/share/vas/vas.conf.defaults` | Referencia de valores por defecto (solo lectura) |
-| `usr/share/vas/hooks.d.examples/val-local` | Hook de ejemplo: notificación UDP a instancias VAL-Aware |
+| `/usr/bin/vas` | Lanzador del servidor (uvicorn) |
+| `/usr/bin/vas-cleanup` | Gestión manual interactiva del ciclo de vida |
+| `/usr/lib/vas/vas.py` | Servidor FastAPI: endpoints, configuración, ciclo de vida |
+| `/usr/lib/vas/database.py` | Capa SQLite: clientes, versión, hooks fire-and-forget |
+| `/usr/lib/vas/vas_log.py` | Logging configurable (`LOG_LEVEL`, `LOG_FILE`) |
+| `/etc/vas/vas.conf` | Configuración principal |
+| `/etc/vas/vas.conf.d/` | Overlays en orden lexical |
+| `/etc/vas/hooks.d/` | Scripts lanzados tras cada `bump_version` |
+| `/usr/share/vas/vas.conf.defaults` | Referencia exhaustiva de todas las variables (solo lectura) |
+| `/usr/share/vas/hooks.d.examples/val-local` | Hook de ejemplo: push UDP a instancias VAL-Aware |
+| `/lib/systemd/system/vas.service` | Unidad systemd (corre como usuario `vas`) |
 
-## API
+## Estado en disco
+
+| Ruta | Descripción |
+|---|---|
+| `/var/lib/vas/vas.db` | Base de datos SQLite |
+| `/var/lib/vas/version` | Versión del inventario (`YYYYMMDDHHMMSSmmm`) |
+| `/var/log/vas/` | Logs opcionales (`LOG_FILE`, `HOOKS_LOG`) |
+
+## API REST
 
 | Método | Endpoint | Descripción |
 |---|---|---|
-| `POST` | `/register` | Registra o actualiza un cliente. Retorna `{status, version}`. |
-| `POST` | `/heartbeat` | Actualiza `last_seen`. Sube versión si el cliente era `inactive`/`archived` (reactivación). 404 si UUID desconocido. |
-| `GET` | `/version` | Versión actual del registro (`YYYYMMDDHHMMSSmmm`). |
-| `GET` | `/clients` | Clientes filtrados por `?status=` y/o `?extra_key=` (default: `active`). |
-| `GET` | `/clients/{id}` | Cliente individual por UUID. 404 si no existe. |
+| `GET` | `/health` | Healthcheck sin side-effects ni log (proxies, monitorización) |
+| `GET` | `/version` | Versión actual del inventario |
+| `GET` | `/clients` | Clientes filtrados por `?status=` y/o `?extra_key=` |
+| `GET` | `/clients/{id}` | Cliente individual por UUID |
+| `POST` | `/register` | Registra o actualiza un cliente; retorna `{status, version}` |
+| `POST` | `/heartbeat` | Actualiza `last_seen` sin tocar datos; retorna 404 si UUID desconocido |
 
-La versión solo se incrementa cuando cambian datos reales de algún cliente o cuando un cliente pasa a `inactive`. Los heartbeats periódicos actualizan `last_seen` sin modificar la versión.
-
-`GET /clients` acepta `?extra_key=<clave>` para filtrar clientes que tengan esa clave en `extra_imperative` o `extra_informative`. Combinable con `?status=`. La respuesta incluye los campos extra completos; el consumidor decide qué hacer con ellos.
-
-### Semántica de campos extra
-
-`POST /register` acepta `extra_imperative` y `extra_informative` (objetos JSON opcionales):
-
-| Valor recibido | Efecto en BD |
-|---|---|
-| `{"k":"v"}` | Sobreescribe el campo |
-| `null` (omitido) | COALESCE: conserva el valor existente |
-| `{}` | Borra el campo (NULL en BD) |
-
-Solo `extra_imperative` dispara `bump_version`. `extra_informative` es puramente informativo.
+La versión solo sube cuando cambian datos reales o un cliente pasa a `inactive`. Los heartbeats periódicos no modifican la versión.
 
 ## Ciclo de vida de clientes
 
 ```
-active   → registrándose normalmente (last_seen reciente)
-inactive → sin heartbeat desde TTL_INACTIVE_DAYS días  → sube versión
-archived → sin heartbeat desde TTL_ARCHIVE_DAYS días   → solo histórico
-(purge)  → eliminación definitiva tras TTL_PURGE_DAYS  → TTL_PURGE_DAYS=0: nunca
+active → inactive  (TTL_INACTIVE, sube versión → consumidores detectan la baja)
+       → archived  (TTL_ARCHIVE, histórico)
+       → DELETE    (TTL_PURGE; 0d = conservar para siempre)
 ```
 
-Las transiciones se ejecutan en cada arranque de VAS y pueden forzarse con `vas-cleanup`.
+Cualquier `POST /register` o `POST /heartbeat` reactiva un cliente `inactive`/`archived` automáticamente.
 
-Un cliente `inactive` o `archived` vuelve a `active` automáticamente al hacer `POST /register` o `POST /heartbeat`. Ambos endpoints suben versión al reactivar, para que los consumidores detecten el cambio.
-
-## Flujo de arranque
-
-```
-load_config()         → /etc/vas/vas.conf + /etc/vas/vas.conf.d/*.conf
-validate_paths()      → crea /var/lib/vas si falta; FATAL si sin permisos
-database.init_db()    → CREATE TABLE IF NOT EXISTS clients (+ migraciones)
-lifespan (startup):
-  run_lifecycle()
-    → active  → inactive  (TTL_INACTIVE_DAYS; bump_version si hay cambios)
-    → inactive → archived (TTL_ARCHIVE_DAYS)
-    → archived → DELETE   (TTL_PURGE_DAYS; 0 = desactivado)
-[endpoints activos]
-```
-
-## Limpieza manual (`vas-cleanup`)
-
-Herramienta interactiva con interfaz Zenity, dialog o terminal. Permite ejecutar cada paso del ciclo de vida de forma independiente o como ciclo completo, con confirmación antes de cada operación destructiva.
+El ciclo se ejecuta al **arrancar VAS** y cada `LIFECYCLE_INTERVAL` (defecto: `24h`). El parser de duraciones acepta `30d`, `12h`, `90m`, `60s`; sin sufijo asume días con `[WARN]` en log.
 
 ## Configuración
 
-Fichero principal: `/etc/vas/vas.conf`  
-Overlays (orden lexical): `/etc/vas/vas.conf.d/*.conf`
-
-| Variable | Defecto | Descripción |
-|---|---|---|
-| `PORT` | `8000` | Puerto HTTP de escucha |
-| `DB_PATH` | `/var/lib/vas/vas.db` | Base de datos SQLite |
-| `VERSION_FILE` | `/var/lib/vas/version` | Fichero de versión |
-| `TTL_INACTIVE_DAYS` | `30` | Días sin heartbeat para pasar a `inactive` |
-| `TTL_ARCHIVE_DAYS` | `90` | Días sin heartbeat para pasar a `archived` |
-| `TTL_PURGE_DAYS` | `365` | Días en `archived` antes de eliminar (0 = nunca) |
-| `LOG_LEVEL` | `normal` | Nivel de log: `no` (silencio), `normal` (eventos importantes), `debug` (detallado) |
-| `LOG_FILE` | — | Fichero de log adicional con timestamp ISO-8601 UTC (vacío = solo journald) |
-| `HOOKS_DIR` | `/etc/vas/hooks.d` | Directorio de scripts ejecutados tras cada `bump_version` (fire and forget) |
-
-> Los TTLs deben ser notablemente mayores que `CHECK_SECONDS` de los clientes VAC. Con `CHECK_SECONDS=300` y `TTL_INACTIVE_DAYS=30`, el margen es de más de 8000× .
-
-## Notificación push: hooks de bump_version
-
-Tras cada `bump_version()`, VAS lanza en paralelo (fire and forget) todos los scripts ejecutables de `HOOKS_DIR`. No espera resultados ni los registra en el flujo principal.
-
-Cada hook recibe:
-
-| Variable | Valor |
-|---|---|
-| `VAS_HOST` | URL base de esta instancia (`http://127.0.0.1:PORT`) |
-| `VAS_VERSION` | Versión que disparó el evento |
-
-### Hook val-local
-
-El hook de ejemplo `val-local` implementa la notificación push a instancias VAL-Aware:
-
-1. Consulta `GET /clients?extra_key=inform` — clientes que tengan la clave `inform` en sus extras.
-2. Para cada uno, envía un datagrama UDP a `extra_imperative.inform.url`.
-3. VAL-Aware recibe el UDP, interrumpe su `sleep` y consulta `/version` inmediatamente.
-
-```bash
-# Activar el hook
-cp /usr/share/vas/hooks.d.examples/val-local /etc/vas/hooks.d/
-chmod +x /etc/vas/hooks.d/val-local
+```ini
+# /etc/vas/vas.conf  (referencia completa en vas.conf.defaults)
+PORT=8000
+TTL_INACTIVE=30d
+TTL_ARCHIVE=90d
+TTL_PURGE=365d
+LIFECYCLE_INTERVAL=24h
+LOG_LEVEL=normal
+# LOG_FILE=/var/log/vas/vas.log
+HOOKS_DIR=/etc/vas/hooks.d
+# HOOKS_LOG=/var/log/vas/hooks.log
 ```
 
-El hook requiere que cada equipo cliente publique en VAC:
-```bash
-echo '{"url":"10.0.1.5:9876"}' | vac-register --imperative --key inform -
-```
+## Notificación push (hooks)
 
-Y que VAL tenga `BUMP_LISTEN_PORT=9876` configurado. Ver documentación de VAL-Aware.
+Tras cada `bump_version`, VAS lanza en paralelo (fire-and-forget) todos los scripts ejecutables de `HOOKS_DIR`. En instalación fresca, el hook `val-local` se activa automáticamente: envía un datagrama UDP a cada equipo que haya publicado su endpoint en `extra_imperative.inform.url`, permitiendo que VAL-Aware reaccione en milisegundos.
+
+La salida de los hooks va a journald por defecto (junto a los mensajes `[VAS]`). Con `HOOKS_LOG` se redirige a un fichero independiente.
 
 ## Seguridad
 
-- El servicio corre como usuario dedicado `vas` (sin shell, sin home).
-- El parser de configuración no ejecuta código: usa `split("=", 1)` + strip de comillas.
-- `GET /clients` no incluye el UUID en el listado público; solo `GET /clients/{id}` lo devuelve (quien lo consulta ya lo conoce).
+- Corre como usuario de sistema `vas` (sin shell, sin home).
+- El parser de configuración no ejecuta código: divide `clave=valor` + strip de comillas.
+- `GET /clients` omite el UUID del listado público; solo `GET /clients/{id}` lo expone.
 
-## Logging
-
-Formato de salida: `[VAS] [SCOPE] mensaje` (normal) · `[VAS] [DEBUG] [SCOPE] mensaje` (debug).
-
-```bash
-journalctl -u vas -f                        # tiempo real
-journalctl -u vas | grep '\[DEBUG\]'        # solo debug
-journalctl -u vas | grep '\[ERROR\]'        # solo errores
-journalctl -u vas | grep '\[LIFECYCLE\]'    # transiciones de ciclo de vida
-```
-
-El prefijo `[VAS]` lo añade `vas_log.py` automáticamente. Ver la wiki ([Logging](../../vx-dga-l-vas.wiki/-/blob/main/Logging.md)) para la referencia completa de scopes.
-
-## Servicio systemd
+## Servicio
 
 ```bash
 systemctl status vas
 systemctl restart vas
 journalctl -u vas -f
+journalctl -u vas | grep '\[LIFECYCLE\]'
+journalctl -u vas | grep '\[ERROR\]'
 ```
 
-## Construcción del paquete
+## Wiki
 
-```bash
-dpkg-buildpackage -us -uc -b
-```
+[Instalación](../../wiki/Instalacion) · [Configuración](../../wiki/Configuracion) · [API](../../wiki/API) · [Ciclo de vida](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Notificación push](../../wiki/Push-notify)
