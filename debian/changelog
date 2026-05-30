@@ -12,7 +12,7 @@ vx-dga-l-vas (0.9-15~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 30 May 2026 10:00:00 +0200
 
-vx-dga-l-vas (0.9-14~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-14) unstable; urgency=low
 
   * vas.py: nuevo endpoint GET /health → {"status": "ok"}.
     Sin side-effects ni entradas en el log. Para proxies inversos (nginx,
@@ -20,7 +20,7 @@ vx-dga-l-vas (0.9-14~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 15:00:00 +0200
 
-vx-dga-l-vas (0.9-13~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-13) unstable; urgency=low
 
   * vas.py: nuevo parser de duraciones parse_duration() — acepta 30d, 12h, 90m,
     60s (insensible a mayúsculas). Sin sufijo: emite [WARN] y asume días.
@@ -45,13 +45,13 @@ vx-dga-l-vas (0.9-13~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 14:00:00 +0200
 
-vx-dga-l-vas (0.9-12~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-12) unstable; urgency=low
 
   * usr/bin/vas: set -e → set -euo pipefail, alineado con el resto del ecosistema.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 11:00:00 +0200
 
-vx-dga-l-vas (0.9-11~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-11) unstable; urgency=low
 
   * vas-cleanup: conversión booleana a Python corregida — sustituye el
     patrón '$DO_X && echo True || echo False' (dependía de /bin/false como
@@ -61,7 +61,7 @@ vx-dga-l-vas (0.9-11~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 10:00:00 +0200
 
-vx-dga-l-vas (0.9-10~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-10) unstable; urgency=low
 
   * vas.service: corregido After=network.target → After=network-online.target;
     añadido Wants=network-online.target. Alineado con el resto del ecosistema.
@@ -76,14 +76,14 @@ vx-dga-l-vas (0.9-10~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 28 May 2026 14:30:00 +0200
 
-vx-dga-l-vas (0.9-9~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-9) unstable; urgency=low
 
   * database.py: _run_hooks() añade stdin=subprocess.DEVNULL al Popen
     para evitar bloqueo cuando el hook lee stdin en entornos sin systemd.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 27 May 2026 22:00:00 +0200
 
-vx-dga-l-vas (0.9-8~rc) unstable; urgency=medium
+vx-dga-l-vas (0.9-8) unstable; urgency=medium
 
   * Hooks de bump_version: VAS lanza en paralelo (fire and forget) los scripts
     ejecutables de HOOKS_DIR tras cada bump_version(). No espera ni comprueba
@@ -99,7 +99,7 @@ vx-dga-l-vas (0.9-8~rc) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 19:00:00 +0200
 
-vx-dga-l-vas (0.9-7~rc) unstable; urgency=medium
+vx-dga-l-vas (0.9-7) unstable; urgency=medium
 
   * GET /clients: nuevo parámetro opcional ?extra_key=<clave>.
     Filtra la respuesta a los clientes que tengan esa clave presente en
@@ -112,7 +112,7 @@ vx-dga-l-vas (0.9-7~rc) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 12:00:00 +0200
 
-vx-dga-l-vas (0.9-6~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-6) unstable; urgency=low
 
   * prerm: stop/disable solo en remove, no en upgrade; eliminado check
     redundante con systemctl list-unit-files.
@@ -120,7 +120,7 @@ vx-dga-l-vas (0.9-6~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 15 May 2026 12:00:00 +0200
 
-vx-dga-l-vas (0.9-5~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-5) unstable; urgency=low
 
   * Añadido /usr/share/vas/vas.conf.defaults: copia de referencia de la
     configuración por defecto, siempre actualizada en upgrade.
@@ -131,7 +131,7 @@ vx-dga-l-vas (0.9-5~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 15 May 2026 12:00:00 +0200
 
-vx-dga-l-vas (0.9-4~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-4) unstable; urgency=low
 
   * database.py: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos)
     en lugar de YYYYMMDDHHMMSS (14 dígitos), añadiendo milisegundos UTC.
@@ -141,7 +141,7 @@ vx-dga-l-vas (0.9-4~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 17:00:00 +0200
 
-vx-dga-l-vas (0.9-3~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-3) unstable; urgency=low
 
   * Normalizado el formato de salida de log para alinearlo con la filosofía
     de VAC (vx-dga-l-vac):
@@ -161,7 +161,7 @@ vx-dga-l-vas (0.9-3~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 14 May 2026 12:00:00 +0200
 
-vx-dga-l-vas (0.9-2~rc) unstable; urgency=low
+vx-dga-l-vas (0.9-2) unstable; urgency=low
 
   * Logging configurable via LOG_LEVEL (no|normal|debug) y LOG_FILE opcional.
     - usr/lib/vas/vas_log.py: nuevo módulo compartido con log() y log_debug()
