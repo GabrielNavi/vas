@@ -102,6 +102,14 @@ journalctl -u vas | grep '\[LIFECYCLE\]'
 journalctl -u vas | grep '\[ERROR\]'
 ```
 
+## Seguridad
+
+VAS no implementa autenticación en su API REST. **No exponer el puerto 8000 a redes no confiables.** El modelo de seguridad asume que todos los clientes de la red son de confianza (red de aula gestionada centralmente).
+
+- Si se requiere autenticación, situar un proxy inverso (nginx, HAProxy) delante de VAS con la autenticación que corresponda.
+- El UUID del cliente actúa como identificador implícito para `GET /clients/{id}`, pero no como credencial de seguridad.
+- Para HTTPS, configurar `VAS_SCHEME=https` en los clientes y terminar TLS en el proxy.
+
 ## Wiki
 
 [Instalación](../../wiki/Instalacion) · [Configuración](../../wiki/Configuracion) · [API](../../wiki/API) · [Ciclo de vida](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Notificación push](../../wiki/Push-notify)
