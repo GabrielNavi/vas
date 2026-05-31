@@ -1,0 +1,13 @@
+/var/log/vas/*.log {
+    daily
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 vas adm
+    sharedscripts
+    postrotate
+        systemctl kill -s HUP vas.service 2>/dev/null || true
+    endscript
+}
