@@ -9,122 +9,124 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com/)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)]()
 
-Servidor de inventario de red ligero para entornos Linux gestionados centralmente. Mantiene el registro canónico de equipos activos, inactivos y archivados mediante una API REST minimalista. Diseñado para redes educativas con centenares de clientes.
+Lightweight network inventory server for centrally managed Linux environments. Maintains the canonical registry of active, inactive, and archived machines through a minimalist REST API. Designed for educational networks with hundreds of clients.
+
+> 📖 [Versión en español](README.es.md)
 
 ---
 
-## Tabla de contenidos
+## Table of Contents
 
-- [Ecosistema](#ecosistema)
-- [Instalación rápida](#instalación-rápida)
-- [Archivos instalados](#archivos-instalados)
-- [API REST](#api-rest)
-- [Ciclo de vida de clientes](#ciclo-de-vida-de-clientes)
-- [Configuración](#configuración)
-- [Notificación push (hooks)](#notificación-push-hooks)
-- [Seguridad](#seguridad)
-- [Servicio](#servicio)
+- [Ecosystem](#ecosystem)
+- [Quick Start](#quick-start)
+- [Installed Files](#installed-files)
+- [REST API](#rest-api)
+- [Client Lifecycle](#client-lifecycle)
+- [Configuration](#configuration)
+- [Push Notifications (Hooks)](#push-notifications-hooks)
+- [Security](#security)
+- [Service Management](#service-management)
 - [Wiki](#wiki)
-- [Licencia](#licencia)
+- [License](#license)
 
 ---
 
-## Ecosistema
+## Ecosystem
 
 ```
-VAS  ←─ POST /register, /heartbeat ── VAC  (cliente, cada equipo)
-VAS  ──→ bump hooks / UDP push      ──▶ VAL  (consumidor con hooks)
-VAS  ←─ federación                  ── VAF  (servidor federado, experimental)
+VAS  ←─ POST /register, /heartbeat ── VAC  (client, each machine)
+VAS  ──→ bump hooks / UDP push      ──▶ VAL  (generic consumer with hooks)
+VAS  ←─ federation                  ── VAF  (federated server, experimental)
 ```
 
-| Paquete | Repositorio | Descripción |
-|---------|-------------|-------------|
-| `versatile-autoreg-vas` | [vas](https://github.com/GabrielNavi/vas) ← *este* | Servidor de inventario |
-| `versatile-autoreg-vac` | vac | Cliente de autoregistro |
-| `versatile-autoreg-val` | val | Consumidor genérico con hooks |
-| `versatile-autoreg-vaf` | vaf | Federación de servidores (experimental) |
+| Package | Repository | Description |
+|---------|------------|-------------|
+| `versatile-autoreg-vas` | [vas](https://github.com/GabrielNavi/vas) ← *this* | Inventory server |
+| `versatile-autoreg-vac` | vac | Autoregistration client |
+| `versatile-autoreg-val` | val | Generic consumer with hooks |
+| `versatile-autoreg-vaf` | vaf | Server federation (experimental) |
 
 ---
 
-## Instalación rápida
+## Quick Start
 
 ```bash
-# Instalar el paquete Debian
+# Install the Debian package
 sudo dpkg -i versatile-autoreg-vas_*.deb
-sudo apt-get -f install          # resolver dependencias si es necesario
+sudo apt-get -f install          # resolve dependencies if needed
 
-# Configurar (mínimo necesario — todos los defaults son válidos)
+# Configure (optional — all defaults are sensible)
 sudo nano /etc/vas/vas.conf
 
-# Arrancar
+# Start
 sudo systemctl enable --now vas
 
-# Verificar
+# Verify
 curl http://localhost:8000/health
 ```
 
-> **Dependencias:** `python3-fastapi`, `uvicorn | python3-uvicorn`, `python3-pydantic`  
-> Ver [Instalación](../../wiki/Instalacion) en la wiki para instrucciones completas.
+> **Dependencies:** `python3-fastapi`, `uvicorn | python3-uvicorn`, `python3-pydantic`  
+> See [Installation](../../wiki/Instalacion) in the wiki for full instructions.
 
 ---
 
-## Archivos instalados
+## Installed Files
 
-| Ruta | Descripción |
+| Path | Description |
 |------|-------------|
-| `/usr/bin/vas` | Lanzador del servidor (uvicorn) |
-| `/usr/bin/vas-cleanup` | Gestión manual interactiva del ciclo de vida |
-| `/usr/lib/vas/vas.py` | Servidor FastAPI: endpoints, configuración, ciclo de vida |
-| `/usr/lib/vas/database.py` | Capa SQLite: clientes, versión, hooks fire-and-forget |
-| `/usr/lib/vas/vas_log.py` | Logging configurable (`LOG_LEVEL`, `LOG_FILE`) |
-| `/etc/vas/vas.conf` | Configuración principal |
-| `/etc/vas/vas.conf.d/` | Overlays en orden lexical |
-| `/etc/vas/hooks.d/` | Scripts lanzados tras cada `bump_version` |
-| `/usr/share/vas/vas.conf.defaults` | Referencia exhaustiva de todas las variables (solo lectura) |
-| `/usr/share/vas/hooks.d.examples/val-local` | Hook de ejemplo: push UDP a instancias VAL-Aware |
-| `/lib/systemd/system/vas.service` | Unidad systemd (corre como usuario `vas`) |
-| `/var/lib/vas/vas.db` | Base de datos SQLite (creada al arrancar) |
-| `/var/lib/vas/version` | Versión del inventario (`YYYYMMDDHHMMSSmmm`) |
+| `/usr/bin/vas` | Server launcher (uvicorn wrapper) |
+| `/usr/bin/vas-cleanup` | Interactive CLI for manual lifecycle management |
+| `/usr/lib/vas/vas.py` | FastAPI server: endpoints, config, lifecycle logic |
+| `/usr/lib/vas/database.py` | SQLite layer: clients, version, fire-and-forget hooks |
+| `/usr/lib/vas/vas_log.py` | Configurable logging (`LOG_LEVEL`, `LOG_FILE`) |
+| `/etc/vas/vas.conf` | Main configuration file |
+| `/etc/vas/vas.conf.d/` | Config overlays applied in lexical order |
+| `/etc/vas/hooks.d/` | Scripts executed after each `bump_version` |
+| `/usr/share/vas/vas.conf.defaults` | Exhaustive reference of all variables (read-only) |
+| `/usr/share/vas/hooks.d.examples/val-local` | Example hook: UDP push to VAL-Aware instances |
+| `/lib/systemd/system/vas.service` | systemd unit (runs as `vas` system user) |
+| `/var/lib/vas/vas.db` | SQLite database (created on first start) |
+| `/var/lib/vas/version` | Inventory version string (`YYYYMMDDHHMMSSmmm`) |
 
 ---
 
-## API REST
+## REST API
 
-| Método | Endpoint | Descripción |
+| Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/health` | Healthcheck sin side-effects ni log |
-| `GET` | `/version` | Versión actual del inventario |
-| `GET` | `/clients` | Lista de clientes; soporta `?status=` y `?extra_key=` |
-| `GET` | `/clients/{id}` | Cliente individual por UUID |
-| `POST` | `/register` | Registra o actualiza un cliente; devuelve `{status, version}` |
-| `POST` | `/heartbeat` | Actualiza `last_seen` sin modificar datos; devuelve 404 si UUID desconocido |
+| `GET` | `/health` | Health check with no side-effects or logging |
+| `GET` | `/version` | Current inventory version |
+| `GET` | `/clients` | Client list; supports `?status=` and `?extra_key=` filters |
+| `GET` | `/clients/{id}` | Single client by UUID |
+| `POST` | `/register` | Register or update a client; returns `{status, version}` |
+| `POST` | `/heartbeat` | Update `last_seen` without touching data; returns 404 if UUID unknown |
 
-> La versión del inventario solo sube cuando cambian datos reales o un cliente pasa a `inactive`. Los heartbeats periódicos no modifican la versión.
+> The inventory version only increments when real data changes or a client transitions to `inactive`. Periodic heartbeats do not bump the version.
 
-Documentación completa: [wiki/API](../../wiki/API)
-
----
-
-## Ciclo de vida de clientes
-
-```
-active ──TTL_INACTIVE──▶ inactive  (sube versión → consumidores detectan la baja)
-       ──TTL_ARCHIVE───▶ archived  (histórico, no cuenta como activo)
-       ──TTL_PURGE─────▶ DELETE    (0d = conservar indefinidamente)
-```
-
-- Cualquier `POST /register` o `POST /heartbeat` reactiva un cliente `inactive`/`archived`.
-- El ciclo se ejecuta al **arrancar VAS** y cada `LIFECYCLE_INTERVAL` (por defecto: `24h`).
-- El parser de duraciones acepta `30d`, `12h`, `90m`, `60s`; sin sufijo asume días con `[WARN]`.
-
-Más información: [wiki/Ciclo-de-vida](../../wiki/Ciclo-de-vida)
+Full documentation: [wiki/API](../../wiki/API)
 
 ---
 
-## Configuración
+## Client Lifecycle
+
+```
+active ──TTL_INACTIVE──▶ inactive  (version bumped → consumers detect the drop)
+       ──TTL_ARCHIVE───▶ archived  (historical record, not counted as active)
+       ──TTL_PURGE─────▶ DELETE    (0d = keep forever)
+```
+
+- Any `POST /register` or `POST /heartbeat` reactivates an `inactive`/`archived` client.
+- The lifecycle runs on **VAS startup** and every `LIFECYCLE_INTERVAL` (default: `24h`).
+- Duration parser accepts `30d`, `12h`, `90m`, `60s`; bare integers assume days with a `[WARN]` log entry.
+
+More details: [wiki/Ciclo-de-vida](../../wiki/Ciclo-de-vida)
+
+---
+
+## Configuration
 
 ```ini
-# /etc/vas/vas.conf  (referencia completa en /usr/share/vas/vas.conf.defaults)
+# /etc/vas/vas.conf  (full reference at /usr/share/vas/vas.conf.defaults)
 
 PORT=8000
 TTL_INACTIVE=30d
@@ -137,35 +139,35 @@ HOOKS_DIR=/etc/vas/hooks.d
 # HOOKS_LOG=/var/log/vas/hooks.log
 ```
 
-Los overlays en `/etc/vas/vas.conf.d/*.conf` se aplican en orden lexical sobre `vas.conf`.
+Overlay files in `/etc/vas/vas.conf.d/*.conf` are applied on top of `vas.conf` in lexical order.
 
-Guía completa: [wiki/Configuracion](../../wiki/Configuracion)
-
----
-
-## Notificación push (hooks)
-
-Tras cada `bump_version`, VAS lanza en paralelo (fire-and-forget) todos los scripts ejecutables de `HOOKS_DIR`. El hook incluido `val-local` envía un datagrama UDP a cada VAL-Aware configurado, permitiéndole reaccionar en milisegundos en lugar de esperar el siguiente ciclo de polling.
-
-La salida de los hooks va a journald junto a los mensajes `[VAS]`. Con `HOOKS_LOG` se redirige a un fichero independiente.
-
-Ver también: [versatile-autoreg-hooks](https://github.com/GabrielNavi) — colección de hooks de ejemplo para VAS, VAC y VAL.
+Full guide: [wiki/Configuracion](../../wiki/Configuracion)
 
 ---
 
-## Seguridad
+## Push Notifications (Hooks)
 
-VAS no implementa autenticación en su API REST. **No exponer el puerto a redes no confiables.**
+After each `bump_version`, VAS launches all executable scripts in `HOOKS_DIR` in parallel (fire-and-forget). The bundled `val-local` hook sends a UDP datagram to every VAL-Aware instance that has published its endpoint in `extra_imperative.inform.url`, letting it react in milliseconds instead of waiting for the next polling cycle.
 
-- El modelo de seguridad asume red de gestión cerrada (red de aula gestionada centralmente).
-- Corre como usuario de sistema `vas` (sin shell, sin home escriturable).
-- El parser de configuración no ejecuta código: divide `clave=valor` con strip de comillas.
-- `GET /clients` omite el UUID del listado; solo `GET /clients/{id}` lo expone.
-- Para autenticación o HTTPS: situar un proxy inverso (nginx, HAProxy) delante de VAS y configurar `VAS_SCHEME=https` en los clientes.
+Hook output goes to journald alongside `[VAS]` log messages. Set `HOOKS_LOG` to redirect it to a separate file.
+
+See also: [versatile-autoreg-hooks](https://github.com/GabrielNavi) — collection of example hooks for VAS, VAC and VAL.
 
 ---
 
-## Servicio
+## Security
+
+VAS does not implement authentication on its REST API. **Do not expose the port to untrusted networks.**
+
+- The security model assumes a closed management network (centrally managed classroom network).
+- Runs as the `vas` system user (no shell, no writable home directory).
+- The configuration parser does not execute code: it splits `key=value` pairs with quote stripping.
+- `GET /clients` omits UUIDs from the public listing; only `GET /clients/{id}` exposes them.
+- For authentication or HTTPS: place a reverse proxy (nginx, HAProxy) in front of VAS and set `VAS_SCHEME=https` on the clients.
+
+---
+
+## Service Management
 
 ```bash
 sudo systemctl status vas
@@ -179,10 +181,10 @@ journalctl -u vas | grep '\[ERROR\]'
 
 ## Wiki
 
-[Instalación](../../wiki/Instalacion) · [Configuración](../../wiki/Configuracion) · [API](../../wiki/API) · [Ciclo de vida](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Notificación push](../../wiki/Push-notify)
+[Installation](../../wiki/Instalacion) · [Configuration](../../wiki/Configuracion) · [API](../../wiki/API) · [Client Lifecycle](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Push Notifications](../../wiki/Push-notify)
 
 ---
 
-## Licencia
+## License
 
 [Apache License 2.0](LICENSE)
