@@ -182,7 +182,7 @@ journalctl -u vas | grep '\[ERROR\]'
 
 ## Wiki
 
-[Instalación](../../wiki/Instalacion) · [Configuración](../../wiki/Configuracion) · [API](../../wiki/API) · [Ciclo de vida](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Notificación push](../../wiki/Push-notify)
+[Instalación](../../wiki/ES_Instalacion) · [Configuración](../../wiki/ES_Configuracion) · [API](../../wiki/ES_API) · [Ciclo de vida](../../wiki/ES_Ciclo-de-vida) · [Logging](../../wiki/ES_Logging) · [Notificación push](../../wiki/ES_Notficiacion)
 
 ---
 

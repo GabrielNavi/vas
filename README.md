@@ -38,7 +38,7 @@ Lightweight network inventory server for centrally managed Linux environments. M
 
 ```
 VAS  ←─ POST /register, /heartbeat ── VAC  (client, each machine)
-VAS  ──→ bump hooks / UDP push      ──▶ VAL  (generic consumer with hooks)
+VAS  ──→ bump hooks / UDP push      ── VAL  (generic consumer with hooks)
 VAS  ←─ federation                  ── VAF  (federated server, experimental)
 ```
 
@@ -184,7 +184,7 @@ journalctl -u vas | grep '\[ERROR\]'
 
 ## Wiki
 
-[Installation](../../wiki/Instalacion) · [Configuration](../../wiki/Configuracion) · [API](../../wiki/API) · [Client Lifecycle](../../wiki/Ciclo-de-vida) · [Logging](../../wiki/Logging) · [Push Notifications](../../wiki/Push-notify)
+[Installation](../../wiki/EN_Install) · [Configuration](../../wiki/EN_Config) · [API](../../wiki/EN_API) · [Client Lifecycle](../../wiki/EN_Lifecycle) · [Logging](../../wiki/EN_Logging) · [Push Notifications](../../wiki/EN_Push-notify)
 
 ---
 
