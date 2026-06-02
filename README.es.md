@@ -3,6 +3,9 @@
   <h1>VAS — Versatile Autoregistration Server</h1>
 </div>
 
+[![en](https://img.shields.io/badge/lang-en-blue.svg)](README.md)
+[![es](https://img.shields.io/badge/lang-es-green.svg)](README.es.md)
+
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Debian package](https://img.shields.io/badge/package-versatile--autoreg--vas-brightgreen)](https://github.com/GabrielNavi/vas/releases)
 [![Python 3](https://img.shields.io/badge/python-3.x-blue.svg)](https://www.python.org/)
