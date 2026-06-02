@@ -184,7 +184,7 @@ journalctl -u vas | grep '\[ERROR\]'
 
 ## Wiki
 
-[Installation](../../wiki/EN_Install) · [Configuration](../../wiki/EN_Config) · [API](../../wiki/EN_API) · [Client Lifecycle](../../wiki/EN_Lifecycle) · [Logging](../../wiki/EN_Logging) · [Push Notifications](../../wiki/EN_Push-notify)
+[Installation](../../wiki/Install) · [Configuration](../../wiki/Config) · [API](../../wiki/API) · [Client Lifecycle](../../wiki/Lifecycle) · [Logging](../../wiki/Logging) · [Push Notifications](../../wiki/Push-notify)
 
 ---
 
