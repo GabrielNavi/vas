@@ -36,7 +36,7 @@ Servidor de inventario de red ligero para entornos Linux gestionados centralment
 
 ```
 VAS  ←─ POST /register, /heartbeat ── VAC  (cliente, cada equipo)
-VAS  ──→ bump hooks / UDP push      ──▶ VAL  (consumidor con hooks)
+VAS  ──→ bump hooks / UDP push      ── VAL  (consumidor con hooks)
 VAS  ←─ federación                  ── VAF  (servidor federado, experimental)
 ```
 
