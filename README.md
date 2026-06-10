@@ -47,7 +47,7 @@ VAS  ←─ federation                  ── VAF  (federated server, experimen
 | `versatile-autoreg-vas` | [vas](https://github.com/GabrielNavi/vas) ← *this* | Inventory server |
 | `versatile-autoreg-vac` | [vac](https://github.com/GabrielNavi/vac) | Autoregistration client |
 | `versatile-autoreg-val` | [val](https://github.com/GabrielNavi/val) | Generic consumer with hooks |
-| `versatile-autoreg-vaf` | vaf | Server federation (experimental) |
+| `versatile-autoreg-vaf` | [vaf](https://github.com/GabrielNavi/vaf) | Server federation (beta) |
 
 ---
 
