@@ -1,6 +1,7 @@
 versatile-autoreg-vas (0.9.18) unstable; urgency=low
 
-  * Arreglo de funciones (pydantic field_validator) para que se mantenga compatibilidad con pydantic V1
+  * Arreglo de funciones (pydantic field_validator) para que se mantenga 
+    compatibilidad con pydantic V1
 
  -- Gabriel Navia <contacto@gabrielnav.es>  Mon, 22 Jun 2026 11:00:00 +0200
 

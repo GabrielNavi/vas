@@ -1,6 +1,6 @@
 Source: versatile-autoreg-vas
 Priority: optional
-Maintainer: Gabriel Navia <correos@gabrielnav.es>
+Maintainer: Gabriel Navia <contacto@gabrielnav.es>
 Standards-Version: 4.7.0
 Build-Depends: debhelper-compat (= 13)
 Section: admin
@@ -15,3 +15,4 @@ Description: Servidor de Autorregistro Versátil (VAS)
  La integración con Veyon se gestiona mediante el paquete opcional
  versatile-autoreg-veyon-sync.
  
+
