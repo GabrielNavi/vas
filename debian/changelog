@@ -1,10 +1,10 @@
-versatile-autoreg-vas (0.9-18) unstable; urgency=low
+versatile-autoreg-vas (0.9.18) unstable; urgency=low
 
   * Arreglo de funciones (pydantic field_validator) para que se mantenga compatibilidad con pydantic V1
 
  -- Gabriel Navia <contacto@gabrielnav.es>  Mon, 22 Jun 2026 11:00:00 +0200
 
-versatile-autoreg-vas (0.9-17) unstable; urgency=low
+versatile-autoreg-vas (0.9.17) unstable; urgency=low
 
   * vas.py: valida que id e ip no vayan vacíos y recorta espacios; el
     heartbeat también rechaza ids vacíos.
@@ -18,7 +18,7 @@ versatile-autoreg-vas (0.9-17) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 19:00:00 +0200
 
-versatile-autoreg-vas (0.9-16) unstable; urgency=low
+versatile-autoreg-vas (0.9.16) unstable; urgency=low
 
   * database.py: _run_hooks() usa ahora `with open(HOOKS_LOG, "a") as lf`
     en lugar de open/close manual. Evita que el file handle quede abierto
@@ -26,7 +26,7 @@ versatile-autoreg-vas (0.9-16) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 18:00:00 +0200
 
-versatile-autoreg-vas (0.9-15) unstable; urgency=low
+versatile-autoreg-vas (0.9.15) unstable; urgency=low
 
   * postinst: en instalación fresca, copia val-local desde
     /usr/share/vas/hooks.d.examples/ a /etc/vas/hooks.d/ con chmod +x.
@@ -40,7 +40,7 @@ versatile-autoreg-vas (0.9-15) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 30 May 2026 10:00:00 +0200
 
-versatile-autoreg-vas (0.9-14) unstable; urgency=low
+versatile-autoreg-vas (0.9.14) unstable; urgency=low
 
   * vas.py: nuevo endpoint GET /health → {"status": "ok"}.
     Sin side-effects ni entradas en el log. Para proxies inversos (nginx,
@@ -48,7 +48,7 @@ versatile-autoreg-vas (0.9-14) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 15:00:00 +0200
 
-versatile-autoreg-vas (0.9-13) unstable; urgency=low
+versatile-autoreg-vas (0.9.13) unstable; urgency=low
 
   * vas.py: nuevo parser de duraciones parse_duration() — acepta 30d, 12h, 90m,
     60s (insensible a mayúsculas). Sin sufijo: emite [WARN] y asume días.
@@ -73,13 +73,13 @@ versatile-autoreg-vas (0.9-13) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 14:00:00 +0200
 
-versatile-autoreg-vas (0.9-12) unstable; urgency=low
+versatile-autoreg-vas (0.9.12) unstable; urgency=low
 
   * usr/bin/vas: set -e → set -euo pipefail, alineado con el resto del ecosistema.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 11:00:00 +0200
 
-versatile-autoreg-vas (0.9-11) unstable; urgency=low
+versatile-autoreg-vas (0.9.11) unstable; urgency=low
 
   * vas-cleanup: conversión booleana a Python corregida — sustituye el
     patrón '$DO_X && echo True || echo False' (dependía de /bin/false como
@@ -89,7 +89,7 @@ versatile-autoreg-vas (0.9-11) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 29 May 2026 10:00:00 +0200
 
-versatile-autoreg-vas (0.9-10) unstable; urgency=low
+versatile-autoreg-vas (0.9.10) unstable; urgency=low
 
   * vas.service: corregido After=network.target → After=network-online.target;
     añadido Wants=network-online.target. Alineado con el resto del ecosistema.
@@ -104,14 +104,14 @@ versatile-autoreg-vas (0.9-10) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 28 May 2026 14:30:00 +0200
 
-versatile-autoreg-vas (0.9-9) unstable; urgency=low
+versatile-autoreg-vas (0.9.9) unstable; urgency=low
 
   * database.py: _run_hooks() añade stdin=subprocess.DEVNULL al Popen
     para evitar bloqueo cuando el hook lee stdin en entornos sin systemd.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 27 May 2026 22:00:00 +0200
 
-versatile-autoreg-vas (0.9-8) unstable; urgency=medium
+versatile-autoreg-vas (0.9.8) unstable; urgency=medium
 
   * Hooks de bump_version: VAS lanza en paralelo (fire and forget) los scripts
     ejecutables de HOOKS_DIR tras cada bump_version(). No espera ni comprueba
@@ -127,7 +127,7 @@ versatile-autoreg-vas (0.9-8) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 19:00:00 +0200
 
-versatile-autoreg-vas (0.9-7) unstable; urgency=medium
+versatile-autoreg-vas (0.9.7) unstable; urgency=medium
 
   * GET /clients: nuevo parámetro opcional ?extra_key=<clave>.
     Filtra la respuesta a los clientes que tengan esa clave presente en
@@ -140,7 +140,7 @@ versatile-autoreg-vas (0.9-7) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 27 May 2026 12:00:00 +0200
 
-versatile-autoreg-vas (0.9-6) unstable; urgency=low
+versatile-autoreg-vas (0.9.6) unstable; urgency=low
 
   * prerm: stop/disable solo en remove, no en upgrade; eliminado check
     redundante con systemctl list-unit-files.
@@ -148,7 +148,7 @@ versatile-autoreg-vas (0.9-6) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 15 May 2026 12:00:00 +0200
 
-versatile-autoreg-vas (0.9-5) unstable; urgency=low
+versatile-autoreg-vas (0.9.5) unstable; urgency=low
 
   * Añadido /usr/share/vas/vas.conf.defaults: copia de referencia de la
     configuración por defecto, siempre actualizada en upgrade.
@@ -159,7 +159,7 @@ versatile-autoreg-vas (0.9-5) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Fri, 15 May 2026 12:00:00 +0200
 
-versatile-autoreg-vas (0.9-4) unstable; urgency=low
+versatile-autoreg-vas (0.9.4) unstable; urgency=low
 
   * database.py: bump_version() genera ahora YYYYMMDDHHMMSSmmm (17 dígitos)
     en lugar de YYYYMMDDHHMMSS (14 dígitos), añadiendo milisegundos UTC.
@@ -169,7 +169,7 @@ versatile-autoreg-vas (0.9-4) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 17:00:00 +0200
 
-versatile-autoreg-vas (0.9-3) unstable; urgency=low
+versatile-autoreg-vas (0.9.3) unstable; urgency=low
 
   * Normalizado el formato de salida de log para alinearlo con la filosofía
     de VAC (versatile-autoreg-vac):
@@ -189,7 +189,7 @@ versatile-autoreg-vas (0.9-3) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 14 May 2026 12:00:00 +0200
 
-versatile-autoreg-vas (0.9-2) unstable; urgency=low
+versatile-autoreg-vas (0.9.2) unstable; urgency=low
 
   * Logging configurable via LOG_LEVEL (no|normal|debug) y LOG_FILE opcional.
     - usr/lib/vas/vas_log.py: nuevo módulo compartido con log() y log_debug()
@@ -203,7 +203,7 @@ versatile-autoreg-vas (0.9-2) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Thu, 14 May 2026 10:00:00 +0200
 
-versatile-autoreg-vas (0.9-1) unstable; urgency=medium
+versatile-autoreg-vas (0.9.1) unstable; urgency=medium
 
   * Nuevo endpoint POST /heartbeat: actualiza last_seen y restaura status='active'
     sin tocar datos del cliente ni subir versión. Devuelve 404 si el UUID es
@@ -219,12 +219,12 @@ versatile-autoreg-vas (0.9-1) unstable; urgency=medium
     ignora null y trata {} como borrado solo si había valor previo.
   * database.py: add_or_update_client() usa SELECT previo para distinguir
     "insertado" de "actualizado" en el log (lastrowid no es fiable con upsert).
-  * debian/install: añadido usr/bin/vas-cleanup (faltaba desde 0.7-1).
-  * Requiere versatile-autoreg-vac >= 0.9-1 para el nuevo protocolo de heartbeat.
+  * debian/install: añadido usr/bin/vas-cleanup (faltaba desde 0.7.1).
+  * Requiere versatile-autoreg-vac >= 0.9.1 para el nuevo protocolo de heartbeat.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 13 May 2026 18:00:00 +0200
 
-versatile-autoreg-vas (0.8-1) unstable; urgency=medium
+versatile-autoreg-vas (0.8.1) unstable; urgency=medium
 
   * Campos extra extensibles en POST /register:
     - extra_imperative  (dict, opcional): cambios disparan bump_version.
@@ -238,7 +238,7 @@ versatile-autoreg-vas (0.8-1) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 17:00:00 +0200
 
-versatile-autoreg-vas (0.7-2) unstable; urgency=medium
+versatile-autoreg-vas (0.7.2) unstable; urgency=medium
 
   * GET /clients elimina el UUID de la respuesta (mínima exposición de datos).
     El UUID no es información pública en el listado general; solo lo devuelve
@@ -246,7 +246,7 @@ versatile-autoreg-vas (0.7-2) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 14:00:00 +0200
 
-versatile-autoreg-vas (0.7-1) unstable; urgency=medium
+versatile-autoreg-vas (0.7.1) unstable; urgency=medium
 
   * Ciclo de vida de clientes: active → inactive → archived → (purge).
     Sustituye el borrado inmediato por transiciones de estado con histórico.
@@ -267,7 +267,7 @@ versatile-autoreg-vas (0.7-1) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 13:00:00 +0200
 
-versatile-autoreg-vas (0.6-5) unstable; urgency=medium
+versatile-autoreg-vas (0.6.5) unstable; urgency=medium
 
   * Simplificado wrapper /usr/bin/vas: sustituido el parser manual de
     configuración por source (. "$CONF_FILE"). El fichero solo es
@@ -276,7 +276,7 @@ versatile-autoreg-vas (0.6-5) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 11:00:00 +0200
 
-versatile-autoreg-vas (0.6-4) unstable; urgency=medium
+versatile-autoreg-vas (0.6.4) unstable; urgency=medium
 
   * Renombrado usuario de sistema _vas → vas: el guión bajo inicial viola
     NAME_REGEX_SYSTEM en Debian y causaba fallo de postinst con adduser.
@@ -284,7 +284,7 @@ versatile-autoreg-vas (0.6-4) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 12 May 2026 10:30:00 +0200
 
-versatile-autoreg-vas (0.6-3) unstable; urgency=low
+versatile-autoreg-vas (0.6.3) unstable; urgency=low
 
   * Añadidos docstrings y logging extensivo en vas.py y database.py
     para depuración con journalctl -u vas -f:
@@ -302,7 +302,7 @@ versatile-autoreg-vas (0.6-3) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 15:00:00 +0200
 
-versatile-autoreg-vas (0.6-2) unstable; urgency=medium
+versatile-autoreg-vas (0.6.2) unstable; urgency=medium
 
   * Corregido wrapper /usr/bin/vas: sustituido source/punto por parser
     seguro (grep + IFS read) para extraer PORT. Elimina el último punto
@@ -311,7 +311,7 @@ versatile-autoreg-vas (0.6-2) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 14:00:00 +0200
 
-versatile-autoreg-vas (0.6-1) unstable; urgency=medium
+versatile-autoreg-vas (0.6.1) unstable; urgency=medium
 
   * Desacoplamiento completo de Veyon: sync_veyon_master() y
     regenerate_json() eliminados del núcleo.
@@ -327,19 +327,19 @@ versatile-autoreg-vas (0.6-1) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 11 May 2026 12:00:00 +0200
 
-versatile-autoreg-vas (0.5-1) unstable; urgency=medium
+versatile-autoreg-vas (0.5.1) unstable; urgency=medium
 
   * Revisión mayor del sistema de logging para depuración de errores.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 4 May 2026 10:30:00 +0200
 
-versatile-autoreg-vas (0.4-4) unstable; urgency=medium
+versatile-autoreg-vas (0.4.4) unstable; urgency=medium
 
   * Corregidos errores de limpieza y localidad de ejecución de los scripts.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
 
-versatile-autoreg-vas (0.4-3) unstable; urgency=medium
+versatile-autoreg-vas (0.4.3) unstable; urgency=medium
 
   * Añadido soporte de subconfiguración en /etc/vas/vas.conf.d/*.conf
     para permitir overlays sin modificar vas.conf base.
@@ -348,7 +348,7 @@ versatile-autoreg-vas (0.4-3) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 27 Apr 2026 10:30:00 +0200
 
-versatile-autoreg-vas (0.4-2) unstable; urgency=medium
+versatile-autoreg-vas (0.4.2) unstable; urgency=medium
 
   * Corregida la ruta de registro para que fallos puntuales al sincronizar
     networkobjects con Veyon Master no bloqueen POST /register.
@@ -356,7 +356,7 @@ versatile-autoreg-vas (0.4-2) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 12:35:00 +0200
 
-versatile-autoreg-vas (0.4-1) unstable; urgency=medium
+versatile-autoreg-vas (0.4.1) unstable; urgency=medium
 
   * Añadida sincronización automática de networkobjects en Veyon Master.
   * VAS ahora genera CSV e importa objetos con formato
@@ -368,7 +368,7 @@ versatile-autoreg-vas (0.4-1) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sun, 20 Apr 2026 11:15:00 +0200
 
-versatile-autoreg-vas (0.3-2) unstable; urgency=medium
+versatile-autoreg-vas (0.3.2) unstable; urgency=medium
 
   * Corregido el wrapper de arranque para usar "/usr/bin/python3 -m uvicorn"
     y evitar fallos por PATH en systemd (error 127).
@@ -378,7 +378,7 @@ versatile-autoreg-vas (0.3-2) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 15 Apr 2026 11:10:00 +0200
 
-versatile-autoreg-vas (0.3-1) unstable; urgency=medium
+versatile-autoreg-vas (0.3.1) unstable; urgency=medium
 
   * Revisión mayor del empaquetado de VAS.
   * Eliminado el venv empaquetado y uso de pip en build.
@@ -388,43 +388,43 @@ versatile-autoreg-vas (0.3-1) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Wed, 15 Apr 2026 10:00:00 +0200
 
-versatile-autoreg-vas (0.2-6) unstable; urgency=medium
+versatile-autoreg-vas (0.2.6) unstable; urgency=medium
 
   * Movimiento de la raíz del árbol del paquete.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:30:00 +0200
 
-versatile-autoreg-vas (0.2-5) unstable; urgency=medium
+versatile-autoreg-vas (0.2.5) unstable; urgency=medium
 
   * Modificación de la base de datos.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:20:00 +0200
 
-versatile-autoreg-vas (0.2-4) unstable; urgency=medium
+versatile-autoreg-vas (0.2.4) unstable; urgency=medium
 
   * Cambio en postinst para no llamar a database.py.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:10:00 +0200
 
-versatile-autoreg-vas (0.2-3) unstable; urgency=medium
+versatile-autoreg-vas (0.2.3) unstable; urgency=medium
 
   * Diseño inicial de vas.py.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 11:00:00 +0200
 
-versatile-autoreg-vas (0.2-2) unstable; urgency=medium
+versatile-autoreg-vas (0.2.2) unstable; urgency=medium
 
   * Cambios en scripts de instalación Debian.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:50:00 +0200
 
-versatile-autoreg-vas (0.2-1) unstable; urgency=medium
+versatile-autoreg-vas (0.2.1) unstable; urgency=medium
 
   * Creado control y normalización de configuración y wrapper de VAS.
 
  -- Gabriel Navia <correos@gabrielnav.es>  Tue, 14 Apr 2026 10:40:00 +0200
 
-versatile-autoreg-vas (0.2-0) unstable; urgency=medium
+versatile-autoreg-vas (0.2.0) unstable; urgency=medium
 
   * Eliminado pip de las dependencias en tiempo de ejecución.
   * Añadido python3-venv a Build-Depends para la configuración del entorno de compilación.
@@ -435,7 +435,7 @@ versatile-autoreg-vas (0.2-0) unstable; urgency=medium
 
  -- Gabriel Navia <correos@gabrielnav.es>  Mon, 13 Apr 2026 13:49:46 +0200
 
-versatile-autoreg-vas (0.1-0) unstable; urgency=medium
+versatile-autoreg-vas (0.1.0) unstable; urgency=medium
 
   * Commit inicial.
   * Esqueleto de paquete Debian para VAS.
