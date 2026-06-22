@@ -25,7 +25,7 @@ from contextlib import asynccontextmanager
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field
 
 import database
 from vas_log import log, log_debug, setup_logging
@@ -284,38 +284,18 @@ class Client(BaseModel):
     extra_informative → dict arbitrario; nunca dispara versión (solo informativo).
     Ambos son opcionales y null-seguros.
     """
-    id:                str
+    id:                str = Field(..., min_length=1)
     hostname:          str
-    ip:                str
+    ip:                str = Field(..., min_length=1)
     mac:               Optional[str]  = None
     extra_imperative:  Optional[dict] = None
     extra_informative: Optional[dict] = None
 
-    @field_validator("id")
-    @classmethod
-    def id_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("id no puede estar vacío")
-        return v.strip()
-
-    @field_validator("ip")
-    @classmethod
-    def ip_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("ip no puede estar vacía")
-        return v.strip()
 
 
 class HeartbeatRequest(BaseModel):
     """Cuerpo de POST /heartbeat: solo el UUID del cliente."""
-    id: str
-
-    @field_validator("id")
-    @classmethod
-    def id_not_empty(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("id no puede estar vacío")
-        return v.strip()
+    id: str = Field(..., min_length=1)
 
 
 # ---------------------------------------------------------------------------
