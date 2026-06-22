@@ -14,3 +14,4 @@ Description: Servidor de Autorregistro Versátil (VAS)
  REST consumible por cualquier servicio (Veyon, LDAP, monitorización...).
  La integración con Veyon se gestiona mediante el paquete opcional
  versatile-autoreg-veyon-sync.
+ 

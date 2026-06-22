@@ -1,10 +1,10 @@
-versatile-autoreg-vas (0.9-18~rc1) unstable; urgency=low
+versatile-autoreg-vas (0.9-18) unstable; urgency=low
 
   * Arreglo de funciones (pydantic field_validator) para que se mantenga compatibilidad con pydantic V1
 
  -- Gabriel Navia <contacto@gabrielnav.es>  Mon, 22 Jun 2026 11:00:00 +0200
 
-versatile-autoreg-vas (0.9-17~rc) unstable; urgency=low
+versatile-autoreg-vas (0.9-17) unstable; urgency=low
 
   * vas.py: valida que id e ip no vayan vacíos y recorta espacios; el
     heartbeat también rechaza ids vacíos.
@@ -18,7 +18,7 @@ versatile-autoreg-vas (0.9-17~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 19:00:00 +0200
 
-versatile-autoreg-vas (0.9-16~rc) unstable; urgency=low
+versatile-autoreg-vas (0.9-16) unstable; urgency=low
 
   * database.py: _run_hooks() usa ahora `with open(HOOKS_LOG, "a") as lf`
     en lugar de open/close manual. Evita que el file handle quede abierto
@@ -26,7 +26,7 @@ versatile-autoreg-vas (0.9-16~rc) unstable; urgency=low
 
  -- Gabriel Navia <correos@gabrielnav.es>  Sat, 30 May 2026 18:00:00 +0200
 
-versatile-autoreg-vas (0.9-15~rc) unstable; urgency=low
+versatile-autoreg-vas (0.9-15) unstable; urgency=low
 
   * postinst: en instalación fresca, copia val-local desde
     /usr/share/vas/hooks.d.examples/ a /etc/vas/hooks.d/ con chmod +x.
