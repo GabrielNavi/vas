@@ -1,3 +1,11 @@
+versatile-autoreg-vas (0.9.22) unstable; urgency=low
+
+  * debian/rules: añadido override_dh_installsystemd --name=vas para garantizar
+    que dh_installsystemd descubre versatile-autoreg-vas.vas.service y genera
+    los scriptlets de enable/start/stop/disable en postinst/prerm/postrm.
+
+ -- Gabriel Navia <contacto@gabrielnav.es>  Mon, 29 Jun 2026 12:00:00 +0200
+
 versatile-autoreg-vas (0.9.20) unstable; urgency=low
 
   * debian/: vas.service movido a debian/versatile-autoreg-vas.vas.service;
