@@ -1,3 +1,12 @@
+versatile-autoreg-vas (0.9.20) unstable; urgency=low
+
+  * debian/: vas.service movido a debian/versatile-autoreg-vas.vas.service;
+    debhelper gestiona automáticamente enable/start/stop/disable vía
+    dh_installsystemd. Eliminada la entrada manual de lib/systemd/system/
+    en debian/install.
+
+ -- Gabriel Navia <contacto@gabrielnav.es>  Mon, 29 Jun 2026 10:00:00 +0200
+
 versatile-autoreg-vas (0.9.18) unstable; urgency=low
 
   * Arreglo de funciones (pydantic field_validator) para que se mantenga 
